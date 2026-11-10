@@ -16,7 +16,7 @@ export const POST = route(async (req) => {
   await enforceRateLimit(`login:ip:${clientIp(req)}`, 20, 900);
   await enforceRateLimit(`login:email:${input.email}`, 8, 900);
 
-  const [user] = await query<{ id: string; name: string; role: "citizen" | "admin"; password_hash: string }>(
+  const [user] = await query<{ id: string; name: string; role: "citizen" | "admin"; password_hash: string | null }>(
     "SELECT id, name, role, password_hash FROM users WHERE lower(email) = $1",
     [input.email],
   );

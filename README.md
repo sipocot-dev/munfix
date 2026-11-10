@@ -25,8 +25,8 @@ submitted → under_review → verified → in_progress → resolved
 | Database | PostgreSQL 16 (`pg`, plain SQL migrations in `db/migrations`) |
 | Redis | Sessions (7-day, hashed token), read-through cache for map/stats queries, rate limiting |
 | Maps | MapLibre GL with raster tiles (OpenStreetMap by default) |
-| Auth | Email + password (bcrypt), httpOnly cookie, roles: `citizen`, `admin` |
-| Photos | Validated by magic bytes, stored in `UPLOAD_DIR`, served through an access-checked route |
+| Auth | Email + password (bcrypt) and optional Google / Facebook sign-in, httpOnly cookie, roles: `citizen`, `admin` |
+| Photos | Validated by magic bytes; stored on local disk or any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, B2); always served through an access-checked route |
 
 Redis is an optimisation, not a dependency of correctness for reads: if it is down the cache is bypassed and the database answers directly.
 
@@ -60,12 +60,29 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 | --- | --- |
 | `DATABASE_URL`, `REDIS_URL` | Service connections |
 | `APP_URL` | Public URL; `https://` marks session cookies `Secure` |
-| `UPLOAD_DIR` | Where report photos are stored (use a persistent volume) |
+| `STORAGE_DRIVER` | `local` (default) or `s3` |
+| `UPLOAD_DIR` | Photo directory for the `local` driver (use a persistent volume) |
+| `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PREFIX` | `s3` driver settings. R2: `S3_REGION=auto` and its account endpoint. MinIO: `S3_FORCE_PATH_STYLE=true` |
+| `OAUTH_GOOGLE_*`, `OAUTH_FACEBOOK_*` | `CLIENT_ID` / `CLIENT_SECRET` for social sign-in (see below) |
 | `NEXT_PUBLIC_MAP_CENTER_*` | Initial map center (Iligan City by default) |
 | `NEXT_PUBLIC_MAP_BOUNDS` | `minLng,minLat,maxLng,maxLat` — reports must be pinned inside this box |
 | `NEXT_PUBLIC_MAP_TILE_URL` | Tile template. The public OSM server is for development only; use a tile provider in production |
 
 The municipality is configuration, not code: change the name, province, center and bounds to deploy for another city.
+
+## Social sign-in
+
+Set `OAUTH_<PROVIDER>_CLIENT_ID` and `_CLIENT_SECRET` and the "Continue with Google/Facebook" button appears; leave them unset and the provider is hidden. Register this redirect URI with the provider (`APP_URL` must be the public URL):
+
+```
+<APP_URL>/api/v1/auth/oauth/google/callback
+<APP_URL>/api/v1/auth/oauth/facebook/callback
+```
+
+- Google needs the `openid email profile` scopes; Facebook needs `email` and `public_profile`.
+- A provider account that has never signed in creates a new citizen. Admin accounts are only created by the seed script.
+- **Account linking:** a *verified* Google email that matches an existing account links to it. Facebook does not guarantee that the user owns an address, so a Facebook email that matches an existing account is refused (the user logs in with their password instead). This prevents account takeover.
+- The flow uses a one-time `state` cookie for CSRF protection. Accounts created via a provider have no password.
 
 ## API
 
@@ -79,6 +96,7 @@ All endpoints are under `/api/v1`. Errors are `{ "error": string }` (validation 
 
 **Auth**
 - `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`
+- `GET /auth/oauth/:provider` (start) and `GET /auth/oauth/:provider/callback` — browser redirects, not JSON
 
 **Citizen** (logged in)
 - `POST /reports` — `multipart/form-data` (`title`, `description`, `categorySlug`, `lat`, `lng`, `barangay?`, `address?`, `photos` ×3) or JSON
@@ -109,4 +127,4 @@ scripts/             migrate.ts and seed.ts
 
 - Rate limits (Redis): 5 sign-ups/hour/IP, login attempts per IP and per email, 10 reports/hour/user.
 - The barangay field suggests Iligan City barangays but accepts any text.
-- Photos are stored on local disk. For multiple app instances, mount shared storage at `UPLOAD_DIR` or swap `lib/uploads.ts` for an object store.
+- Photos default to local disk. Running more than one app instance? Use `STORAGE_DRIVER=s3`. Existing local photos are not migrated automatically; copy the files in `UPLOAD_DIR` into the bucket under the same names.
