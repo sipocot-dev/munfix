@@ -22,6 +22,13 @@ export interface Category {
   description: string | null;
 }
 
+export interface ProblemType {
+  id: number;
+  categoryId: number;
+  slug: string;
+  name: string;
+}
+
 export interface ReportSummary {
   id: string;
   title: string;
@@ -32,6 +39,7 @@ export interface ReportSummary {
   barangay: string | null;
   categorySlug: string;
   categoryName: string;
+  problemType: string | null;
   createdAt: string;
   resolvedAt: string | null;
   thumb: string | null;
@@ -88,6 +96,7 @@ interface SummaryRow {
   barangay: string | null;
   category_slug: string;
   category_name: string;
+  problem_type: string | null;
   created_at: Date;
   resolved_at: Date | null;
   thumb: string | null;
@@ -97,6 +106,7 @@ const SUMMARY_COLUMNS = `
   r.id, r.title, r.status, r.lat, r.lng, r.address, r.barangay,
   r.created_at, r.resolved_at,
   c.slug AS category_slug, c.name AS category_name,
+  (SELECT pt.name FROM problem_types pt WHERE pt.id = r.problem_type_id) AS problem_type,
   (SELECT m.path FROM report_media m WHERE m.report_id = r.id ORDER BY m.created_at LIMIT 1) AS thumb
 `;
 
@@ -111,6 +121,7 @@ function toSummary(row: SummaryRow): ReportSummary {
     barangay: row.barangay,
     categorySlug: row.category_slug,
     categoryName: row.category_name,
+    problemType: row.problem_type,
     createdAt: row.created_at.toISOString(),
     resolvedAt: row.resolved_at ? row.resolved_at.toISOString() : null,
     thumb: row.thumb ? `/api/v1/media/${row.thumb}` : null,
@@ -118,6 +129,24 @@ function toSummary(row: SummaryRow): ReportSummary {
 }
 
 /* ----------------------------- Categories ----------------------------- */
+
+export async function listProblemTypes(): Promise<ProblemType[]> {
+  return cached("problem-types:all:v2", 3600, () =>
+    query<{ id: number; category_id: number; slug: string; name: string }>(
+      "SELECT id, category_id, slug, name FROM problem_types ORDER BY category_id, sort_order, name",
+    ).then((rows) => rows.map((r) => ({ id: r.id, categoryId: r.category_id, slug: r.slug, name: r.name }))),
+  );
+}
+
+/** Resolves and validates a problem type for a category: required when the category has any. */
+async function resolveProblemType(client: PoolClient, categoryId: number, slug: string | undefined): Promise<number | null> {
+  const types = await client.query<{ id: number; slug: string }>("SELECT id, slug FROM problem_types WHERE category_id = $1", [categoryId]);
+  if (types.rowCount === 0) return null;
+  if (!slug) throw new HttpError(400, "Choose the type of problem");
+  const match = types.rows.find((t) => t.slug === slug);
+  if (!match) throw new HttpError(400, "That problem type does not belong to the chosen category");
+  return match.id;
+}
 
 export async function listCategories(): Promise<Category[]> {
   return cached("categories:all", 3600, () =>
@@ -309,6 +338,7 @@ export interface NewReport {
   title: string;
   description: string;
   categorySlug: string;
+  problemTypeSlug?: string;
   lat: number;
   lng: number;
   address?: string;
@@ -319,11 +349,12 @@ export async function createReport(userId: string, input: NewReport, mediaFiles:
   const id = await withTx(async (client) => {
     const cat = await client.query<{ id: number }>("SELECT id FROM categories WHERE slug = $1", [input.categorySlug]);
     if (cat.rowCount === 0) throw new HttpError(400, "Unknown category");
+    const problemTypeId = await resolveProblemType(client, cat.rows[0].id, input.problemTypeSlug);
 
     const res = await client.query<{ id: string }>(
-      `INSERT INTO reports (user_id, category_id, title, description, lat, lng, address, barangay)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
-      [userId, cat.rows[0].id, input.title, input.description, input.lat, input.lng, input.address ?? null, input.barangay ?? null],
+      `INSERT INTO reports (user_id, category_id, problem_type_id, title, description, lat, lng, address, barangay)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [userId, cat.rows[0].id, problemTypeId, input.title, input.description, input.lat, input.lng, input.address ?? null, input.barangay ?? null],
     );
     const reportId = res.rows[0].id;
 
@@ -371,6 +402,7 @@ export interface ReportEdit {
   title?: string;
   description?: string;
   categorySlug?: string;
+  problemTypeSlug?: string;
   address?: string;
   barangay?: string;
 }
@@ -402,6 +434,7 @@ export async function updateOwnReport(id: string, userId: string, edit: ReportEd
       const cat = await client.query<{ id: number }>("SELECT id FROM categories WHERE slug = $1", [edit.categorySlug]);
       if (cat.rowCount === 0) throw new HttpError(400, "Unknown category");
       add("category_id", cat.rows[0].id);
+      add("problem_type_id", await resolveProblemType(client, cat.rows[0].id, edit.problemTypeSlug));
     }
     if (sets.length === 0) return;
 

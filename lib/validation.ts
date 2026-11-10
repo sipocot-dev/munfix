@@ -28,13 +28,14 @@ export const reportSchema = z.object({
   title: z.string().trim().min(5, "Title must be at least 5 characters").max(120),
   description: z.string().trim().min(10, "Please describe the issue in a bit more detail").max(2000),
   categorySlug: z.string().trim().min(1).max(50),
+  problemTypeSlug: optionalText(60),
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
   address: optionalText(200),
   barangay: optionalText(80),
 });
 
-export const reportEditSchema = reportSchema.pick({ title: true, description: true, categorySlug: true, address: true, barangay: true }).partial();
+export const reportEditSchema = reportSchema.pick({ title: true, description: true, categorySlug: true, problemTypeSlug: true, address: true, barangay: true }).partial();
 
 export const transitionSchema = z.object({
   to: z.enum(STATUSES),

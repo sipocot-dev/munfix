@@ -48,7 +48,7 @@ export default async function MyReportsPage() {
                 <StatusBadge status={r.status} />
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                {[r.categoryName, r.barangay].filter(Boolean).join(" · ")} · submitted {formatDate(r.createdAt)}
+                {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · submitted {formatDate(r.createdAt)}
                 {!isPublicStatus(r.status) && r.status !== "rejected" && r.status !== "withdrawn" && r.status !== "duplicate" && (
                   <> · not public yet</>
                 )}

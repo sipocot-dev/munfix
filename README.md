@@ -92,6 +92,19 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 
 The municipality is configuration, not code: change the name, province, center and bounds to deploy for another city.
 
+### Gmail SMTP
+
+```
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=yourname@gmail.com
+SMTP_PASSWORD=<16-character app password>   # Google Account → Security → 2-Step Verification → App passwords
+SMTP_FROM="Better Sipocot <yourname@gmail.com>"
+```
+
+Gmail only sends as the authenticated address. Use **Admin → System → Send test email** to verify.
+
 ## Email notifications
 
 Set `SMTP_URL` (or `SMTP_HOST` and friends) and `MAIL_FROM`, then check it with `npm run mail:test -- you@example.com`. Any SMTP provider works: Amazon SES, Brevo, Mailgun, Resend, Gmail with an app password, and so on. With no SMTP settings, email is off and the rest of the app is unaffected.
@@ -121,6 +134,10 @@ Set `OAUTH_<PROVIDER>_CLIENT_ID` and `_CLIENT_SECRET` and the "Continue with Goo
 - **Account linking:** a *verified* Google email that matches an existing account links to it. Facebook does not guarantee that the user owns an address, so a Facebook email that matches an existing account is refused (the user logs in with their password instead). This prevents account takeover.
 - The flow uses a one-time `state` cookie for CSRF protection. Accounts created via a provider have no password.
 
+## Problem types
+
+Like CitiFix, each category has a short list of specific problems (Roads → Pothole, Cracked road, Missing manhole cover…). Citizens pick one when reporting; it shows on the map popup, lists, report page and moderation queue. Types are defined in `PROBLEM_TYPES` in `lib/setup.ts` and synced on every start (edit the list, restart). Categories without types (e.g. Other) don't ask.
+
 ## Roles and administrator accounts
 
 | Role | Can do |
@@ -146,7 +163,8 @@ Every status change and account change is written to the audit log. The server e
 - Administrators create moderator/staff accounts on **Admin → Users**; a one-time temporary password is shown once and must be changed at first login.
 - Safeguards: you cannot change your own role or deactivate yourself, and the last active administrator can never be demoted or disabled. Role, deactivation and password changes sign the person out everywhere immediately.
 - Citizens can reset a forgotten password by email (needs SMTP) and delete their own account (anonymised; staff accounts must be demoted first).
-- `SEED_DEMO=true` also creates `demo.moderator@munfix.local` and `demo.staff@munfix.local` (password `demo-password`). Never enable it in production.
+- `SEED_DEMO_ACCOUNTS=true` creates demo citizen/moderator/staff logins on startup (`demo.citizen@munfix.local`, `demo.moderator@munfix.local`, `demo.staff@munfix.local`; password `DEMO_PASSWORD`, default `demo-password`). Set a custom `DEMO_PASSWORD` on a public site and deactivate them before real use (Admin → System reminds you).
+- `SEED_DEMO=true` (the seed script) also creates `demo.moderator@munfix.local` and `demo.staff@munfix.local` (password `demo-password`). Never enable it in production.
 
 Pages: `/admin` (work queue), `/admin/overview` (charts), `/admin/users`, `/admin/audit`, `/admin/system` (service health, email test, exact OAuth redirect URIs), `/account`, `/forgot-password`, and the `/privacy`, `/terms`, `/data-deletion` pages that Google and Facebook require for app review.
 

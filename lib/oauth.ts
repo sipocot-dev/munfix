@@ -47,8 +47,9 @@ function config(provider: Provider): ProviderConfig {
     authUrl: env("AUTH_URL") ?? base.authUrl,
     tokenUrl: env("TOKEN_URL") ?? base.tokenUrl,
     userUrl: env("USER_URL") ?? base.userUrl,
-    clientId: env("CLIENT_ID"),
-    clientSecret: env("CLIENT_SECRET"),
+    // AUTH_<PROVIDER>_ID / _SECRET are accepted as aliases (Auth.js naming).
+    clientId: env("CLIENT_ID") ?? process.env[`AUTH_${P}_ID`] ?? undefined,
+    clientSecret: env("CLIENT_SECRET") ?? process.env[`AUTH_${P}_SECRET`] ?? undefined,
   };
 }
 

@@ -138,7 +138,7 @@ export default function Explorer({
                   <StatusBadge status={r.status} />
                 </div>
                 <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {[r.categoryName, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
+                  {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
                 </p>
                 <button
                   type="button"

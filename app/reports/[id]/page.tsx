@@ -40,7 +40,7 @@ export default async function ReportPage({ params }: Props) {
         <StatusBadge status={report.status} />
       </div>
       <p className="mt-2 text-sm text-slate-500">
-        {[report.categoryName, report.barangay, report.address].filter(Boolean).join(" · ")} · reported {formatDate(report.createdAt)}
+        {[report.categoryName, report.problemType, report.barangay, report.address].filter(Boolean).join(" · ")} · reported {formatDate(report.createdAt)}
         {report.resolvedAt && <> · resolved {formatDate(report.resolvedAt)}</>}
       </p>
 

@@ -5,19 +5,21 @@ import { useEffect, useMemo, useState } from "react";
 import { BARANGAYS } from "@/lib/barangays";
 import { apiError } from "@/lib/client";
 import { MUNICIPALITY, withinBounds } from "@/lib/config";
-import type { Category } from "@/lib/reports";
+import type { Category, ProblemType } from "@/lib/reports";
 import LocationPicker, { type LngLat } from "./LocationPicker";
 
 const MAX_FILES = 3;
 const MAX_BYTES = 5 * 1024 * 1024;
 
-export default function ReportForm({ categories }: { categories: Category[] }) {
+export default function ReportForm({ categories, problemTypes }: { categories: Category[]; problemTypes: ProblemType[] }) {
+  const [categorySlug, setCategorySlug] = useState("");
   const router = useRouter();
   const [location, setLocation] = useState<LngLat | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const types = problemTypes.filter((t) => t.categoryId === categories.find((c) => c.slug === categorySlug)?.id);
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
@@ -82,7 +84,7 @@ export default function ReportForm({ categories }: { categories: Category[] }) {
         </label>
         <label className="block text-sm font-medium">
           Category
-          <select name="categorySlug" required defaultValue="" className="field mt-1">
+          <select name="categorySlug" required value={categorySlug} onChange={(e) => setCategorySlug(e.target.value)} className="field mt-1">
             <option value="" disabled>
               Choose a category…
             </option>
@@ -93,6 +95,21 @@ export default function ReportForm({ categories }: { categories: Category[] }) {
             ))}
           </select>
         </label>
+        {types.length > 0 && (
+          <label className="block text-sm font-medium">
+            Type of problem
+            <select key={categorySlug} name="problemTypeSlug" required defaultValue="" className="field mt-1">
+              <option value="" disabled>
+                Choose the problem…
+              </option>
+              {types.map((t) => (
+                <option key={t.slug} value={t.slug}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="block text-sm font-medium">
           Details
           <textarea

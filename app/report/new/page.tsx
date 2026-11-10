@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import ReportForm from "@/components/ReportForm";
 import { MUNICIPALITY } from "@/lib/config";
-import { listCategories } from "@/lib/reports";
+import { listCategories, listProblemTypes } from "@/lib/reports";
 import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Report an issue" };
 
 export default async function NewReportPage() {
   if (!(await getSession())) redirect("/login?next=/report/new");
-  const categories = await listCategories();
+  const [categories, problemTypes] = await Promise.all([listCategories(), listProblemTypes()]);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -17,7 +17,7 @@ export default async function NewReportPage() {
       <p className="mt-2 mb-6 text-slate-600">
         Tell {MUNICIPALITY.name} what needs fixing. Once city staff verify it, it appears on the public map and you can follow its progress.
       </p>
-      <ReportForm categories={categories} />
+      <ReportForm categories={categories} problemTypes={problemTypes} />
     </div>
   );
 }

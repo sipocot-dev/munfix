@@ -21,6 +21,19 @@ export const CATEGORIES: [slug: string, name: string, description: string][] = [
   ["other", "Other", "Anything else that needs the city government's attention"],
 ];
 
+/** Problem types per category slug: [slug, name]. Kept in sync on every start. */
+export const PROBLEM_TYPES: Record<string, [slug: string, name: string][]> = {
+  roads: [["pothole", "Pothole"], ["cracked-road", "Cracked or broken road"], ["missing-manhole", "Missing manhole cover"], ["road-obstruction", "Obstruction on the road"], ["unpaved-road", "Unpaved or muddy road"]],
+  streetlights: [["not-working", "Light not working"], ["flickering", "Flickering light"], ["missing-pole", "Missing or damaged pole"], ["needs-lighting", "Dark area needs a light"]],
+  drainage: [["clogged-canal", "Clogged canal or drain"], ["flooding", "Flooded street"], ["broken-culvert", "Damaged culvert"], ["open-drain", "Uncovered drain"]],
+  garbage: [["uncollected", "Uncollected garbage"], ["illegal-dumping", "Illegal dumping"], ["overflowing-bin", "Overflowing bin"], ["burning-waste", "Burning of waste"]],
+  water: [["pipe-leak", "Leaking pipe"], ["no-water", "No water supply"], ["low-pressure", "Low water pressure"], ["hydrant", "Broken hydrant"]],
+  electricity: [["fallen-pole", "Fallen or leaning pole"], ["exposed-wires", "Exposed or sagging wires"], ["power-outage", "Power outage"]],
+  bridges: [["damaged-bridge", "Damaged bridge"], ["broken-railing", "Broken railing"], ["damaged-sidewalk", "Damaged sidewalk"], ["blocked-footpath", "Blocked footpath"]],
+  signage: [["missing-sign", "Missing sign"], ["damaged-sign", "Damaged or faded sign"], ["obstructed-sign", "Obstructed sign"], ["signal-fault", "Signal not working"]],
+  "public-facilities": [["park", "Park or plaza"], ["public-market", "Public market"], ["barangay-hall", "Barangay hall"], ["public-toilet", "Public toilet"], ["playground", "Playground or court"]],
+};
+
 type Log = (message: string) => void;
 
 export async function migrationFiles(): Promise<string[]> {
@@ -56,6 +69,29 @@ export async function runMigrations(client: PoolClient, log: Log = console.log):
   return ran;
 }
 
+/**
+ * Optional demo logins for trying every role (SEED_DEMO_ACCOUNTS=true). They use DEMO_PASSWORD
+ * (default "demo-password"), never expire, and are listed on Admin -> System so they get removed before launch.
+ */
+async function seedDemoAccounts(client: PoolClient, log: Log): Promise<void> {
+  if (process.env.SEED_DEMO_ACCOUNTS !== "true") return;
+  const password = process.env.DEMO_PASSWORD || "demo-password";
+  const hash = await hashPassword(password);
+  const accounts: [string, string, string][] = [
+    ["demo.citizen@munfix.local", "Demo Citizen", "citizen"],
+    ["demo.moderator@munfix.local", "Demo Moderator", "moderator"],
+    ["demo.staff@munfix.local", "Demo Field Staff", "staff"],
+  ];
+  for (const [email, name, role] of accounts) {
+    const res = await client.query(
+      `INSERT INTO users (email, name, password_hash, role)
+       SELECT $1::text, $2, $3, $4 WHERE NOT EXISTS (SELECT 1 FROM users WHERE lower(email) = $1)`,
+      [email, name, hash, role],
+    );
+    if (res.rowCount) log(`Created demo account ${email} (${role}).`);
+  }
+}
+
 /** Categories (kept in sync with this list) and, if configured, the first admin account. */
 export async function seedEssentials(client: PoolClient, log: Log = console.log): Promise<void> {
   for (const [i, [slug, name, description]] of CATEGORIES.entries()) {
@@ -66,6 +102,18 @@ export async function seedEssentials(client: PoolClient, log: Log = console.log)
     );
   }
   log(`Seeded ${CATEGORIES.length} categories.`);
+
+  for (const [slug, types] of Object.entries(PROBLEM_TYPES)) {
+    for (const [i, [tslug, tname]] of types.entries()) {
+      await client.query(
+        `INSERT INTO problem_types (category_id, slug, name, sort_order)
+         SELECT id, $2, $3, $4 FROM categories WHERE slug = $1
+         ON CONFLICT (category_id, slug) DO UPDATE SET name = EXCLUDED.name, sort_order = EXCLUDED.sort_order`,
+        [slug, tslug, tname, i],
+      );
+    }
+  }
+  await seedDemoAccounts(client, log);
 
   const email = (process.env.SEED_ADMIN_EMAIL ?? "").trim().toLowerCase();
   const password = process.env.SEED_ADMIN_PASSWORD ?? "";

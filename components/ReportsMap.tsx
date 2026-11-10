@@ -37,7 +37,7 @@ function popupNode(r: ReportSummary): HTMLElement {
   title.style.cssText = "font-weight:600;margin:2px 0 4px;color:#0f172a";
 
   const meta = document.createElement("div");
-  meta.textContent = [r.categoryName, r.barangay].filter(Boolean).join(" · ");
+  meta.textContent = [r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ");
   meta.style.cssText = "font-size:12px;color:#64748b;margin-bottom:6px";
 
   const link = document.createElement("a");

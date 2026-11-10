@@ -74,7 +74,7 @@ export default function AdminQueue({ initial, tabs }: { initial: AdminReportRow[
                 <StatusBadge status={r.status} />
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                {[r.categoryName, r.barangay].filter(Boolean).join(" · ")} · by {r.reporterName} · {formatDate(r.createdAt)} ·{" "}
+                {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · by {r.reporterName} · {formatDate(r.createdAt)} ·{" "}
                 <span className="font-mono">{r.id}</span>
               </p>
               <p className="mt-2 line-clamp-3 text-sm text-slate-700">{r.description}</p>

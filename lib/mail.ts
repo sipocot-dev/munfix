@@ -10,7 +10,12 @@ export function mailEnabled(): boolean {
 }
 
 export function mailFrom(): string {
-  if (process.env.MAIL_FROM) return process.env.MAIL_FROM;
+  const configured = process.env.MAIL_FROM || process.env.SMTP_FROM;
+  if (configured) {
+    // Accept `Name email@host` (no angle brackets) as well as the standard `Name <email@host>`.
+    const loose = configured.trim().replace(/^"|"$/g, "").match(/^(.+?)\s+([^\s<>@]+@[^\s<>@]+)$/);
+    return loose ? `${loose[1].replace(/"/g, "")} <${loose[2]}>` : configured;
+  }
   let host = "localhost";
   try {
     host = new URL(process.env.APP_URL ?? "http://localhost").hostname;
@@ -35,7 +40,7 @@ function transporter(): Transporter {
         port,
         // Implicit TLS on 465; other ports upgrade with STARTTLS when the server offers it.
         secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : port === 465,
-        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS ?? "" } : undefined,
+        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD ?? process.env.SMTP_PASS ?? "" } : undefined,
       });
   return g.__mailer;
 }
