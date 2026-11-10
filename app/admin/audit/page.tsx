@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import AdminNav from "@/components/AdminNav";
+import { requirePageRole } from "@/lib/guards";
+import { listAdminActions } from "@/lib/users";
 import { formatDateTime } from "@/lib/format";
 import { listAuditLogs } from "@/lib/reports";
-import { getSession } from "@/lib/session";
 import { STATUS_LABEL } from "@/lib/status";
 
 export const metadata: Metadata = { title: "Audit log" };
@@ -11,20 +12,39 @@ export const metadata: Metadata = { title: "Audit log" };
 const PAGE_SIZE = 50;
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const session = await getSession();
-  if (!session) redirect("/login?next=/admin/audit");
-  if (session.role !== "admin") notFound();
+  const session = await requirePageRole("/admin/audit", "admin");
 
   const page = Math.max(1, Math.floor(Number((await searchParams).page)) || 1);
   // Fetch one extra row to know whether there is a next page.
   const rows = await listAuditLogs(PAGE_SIZE + 1, (page - 1) * PAGE_SIZE);
   const hasNext = rows.length > PAGE_SIZE;
   const entries = rows.slice(0, PAGE_SIZE);
+  const accountActions = page === 1 ? await listAdminActions(25) : [];
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
       <h1 className="text-3xl font-bold tracking-tight">Audit log</h1>
-      <p className="mt-2 mb-6 text-slate-600">Every status change on every report, newest first.</p>
+      <p className="mt-2 mb-4 text-slate-600">Every status change on every report, and every account change, newest first.</p>
+      <AdminNav role={session.role} current="/admin/audit" />
+      {accountActions.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-2 text-lg font-semibold">Account changes</h2>
+          <div className="card divide-y divide-slate-100 text-sm">
+            {accountActions.map((a) => (
+              <div key={a.id} className="flex flex-wrap gap-x-3 px-4 py-2">
+                <span className="text-slate-500">{formatDateTime(a.createdAt)}</span>
+                <span className="font-semibold">{a.action.replace(/_/g, " ")}</span>
+                <span className="text-slate-600">
+                  {a.targetName ?? "—"}
+                  {a.targetEmail ? ` (${a.targetEmail})` : ""} · by {a.actorName ?? "—"}
+                  {a.detail ? ` · ${Object.entries(a.detail).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(",") : String(v)}`).join(", ")}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
+          <h2 className="mb-2 mt-8 text-lg font-semibold">Report changes</h2>
+        </section>
+      )}
 
       <div className="card overflow-x-auto">
         <table className="w-full text-left text-sm">

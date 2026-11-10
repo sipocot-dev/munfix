@@ -55,6 +55,21 @@ export async function queueStatusEmail(
   );
 }
 
+/** Queue a one-off transactional email (e.g. password reset). Returns false when email is not configured. */
+export async function enqueueMail(
+  userId: string | null,
+  to: string,
+  mail: { subject: string; text: string; html: string },
+): Promise<boolean> {
+  if (!mailEnabled()) return false;
+  await query(
+    `INSERT INTO email_outbox (user_id, to_email, subject, text_body, html_body) VALUES ($1, $2, $3, $4, $5)`,
+    [userId, to, mail.subject, mail.text, mail.html],
+  );
+  triggerDrain();
+  return true;
+}
+
 let draining = false;
 let rerun = false;
 

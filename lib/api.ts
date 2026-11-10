@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ZodError } from "zod";
 import { HttpError } from "./errors";
+import type { Role } from "./permissions";
 import { getSession, type Session } from "./session";
 
 /** Wraps a route handler with uniform error handling. */
@@ -27,17 +28,28 @@ export function route<C = unknown>(fn: (req: NextRequest, ctx: C) => Promise<Res
   };
 }
 
-export async function requireUser(): Promise<Session> {
+/**
+ * Requires a signed-in user. Accounts holding a temporary password are blocked from
+ * everything except changing it (pass allowPasswordChange for that one route).
+ */
+export async function requireUser(opts: { allowPasswordChange?: boolean } = {}): Promise<Session> {
   const session = await getSession();
   if (!session) throw new HttpError(401, "Authentication required");
+  if (session.mustChangePassword && !opts.allowPasswordChange) {
+    throw new HttpError(403, "You must choose a new password before continuing", { code: "password_change_required" });
+  }
   return session;
 }
 
-export async function requireAdmin(): Promise<Session> {
+export async function requireRole(...roles: Role[]): Promise<Session> {
   const session = await requireUser();
-  if (session.role !== "admin") throw new HttpError(403, "Forbidden");
+  if (!roles.includes(session.role)) throw new HttpError(403, "Forbidden");
   return session;
 }
+
+export const requireAdmin = () => requireRole("admin");
+/** Moderators, field staff and administrators. */
+export const requireStaff = () => requireRole("moderator", "staff", "admin");
 
 export async function readJson(req: Request): Promise<unknown> {
   try {

@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import bcrypt from "bcryptjs";
 import type { Pool, PoolClient } from "pg";
+import { hashPassword, isStrongBootstrapPassword } from "./passwords";
 
 /** Arbitrary constant; serialises setup across app instances starting at the same time. */
 const SETUP_LOCK = 727274;
@@ -78,17 +78,29 @@ export async function seedEssentials(client: PoolClient, log: Log = console.log)
   }
 
   const exists = await client.query("SELECT 1 FROM users WHERE lower(email) = $1", [email]);
-  if (exists.rowCount === 0) {
-    await client.query(`INSERT INTO users (email, name, password_hash, role) VALUES ($1, 'City Admin', $2, 'admin')`, [
-      email,
-      await bcrypt.hash(password, 10),
-    ]);
-    log(`Created admin user ${email}.`);
-    if (password === "change-me-please") {
-      console.warn("WARNING: the admin account uses the default password. Change SEED_ADMIN_PASSWORD and the account password.");
-    }
-  } else {
+  if (exists.rowCount !== 0) {
     log(`Admin user ${email} already exists; leaving it unchanged.`);
+    return;
+  }
+
+  // The password sits in an env file, so in production insist it is not a well-known default.
+  if (process.env.NODE_ENV === "production" && !isStrongBootstrapPassword(password)) {
+    console.error(
+      "Refusing to create the admin account: SEED_ADMIN_PASSWORD is too weak (use 12+ characters and not the default). " +
+        "Set a strong one and restart, or run `npm run admin:create -- --email you@example.com` to generate credentials.",
+    );
+    return;
+  }
+
+  // must_change_password: the seeded password is only a way in; the admin chooses their own at first login.
+  await client.query(
+    `INSERT INTO users (email, name, password_hash, role, must_change_password, password_changed_at)
+     VALUES ($1, 'City Admin', $2, 'admin', true, NULL)`,
+    [email, await hashPassword(password)],
+  );
+  log(`Created admin user ${email} (must change password at first login).`);
+  if (!isStrongBootstrapPassword(password)) {
+    console.warn("WARNING: the admin account uses a weak or default password. It must be changed at first login.");
   }
 }
 

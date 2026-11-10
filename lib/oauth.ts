@@ -1,5 +1,6 @@
 import { HttpError } from "./errors";
 import { withTx } from "./db";
+import type { Role } from "./permissions";
 
 export type Provider = "google" | "facebook";
 export const PROVIDERS: readonly Provider[] = ["google", "facebook"];
@@ -141,7 +142,7 @@ export async function fetchProfile(provider: Provider, code: string): Promise<Pr
   };
 }
 
-export type OAuthUser = { id: string; name: string; role: "citizen" | "admin" };
+export type OAuthUser = { id: string; name: string; role: Role; is_active: boolean };
 
 /**
  * Finds or creates the local user for a provider profile.
@@ -153,27 +154,32 @@ export type OAuthUser = { id: string; name: string; role: "citizen" | "admin" };
 export async function resolveUser(provider: Provider, profile: ProviderProfile): Promise<OAuthUser> {
   return withTx(async (client) => {
     const linked = await client.query<OAuthUser>(
-      `SELECT u.id, u.name, u.role FROM oauth_accounts o JOIN users u ON u.id = o.user_id
+      `SELECT u.id, u.name, u.role, u.is_active FROM oauth_accounts o JOIN users u ON u.id = o.user_id
         WHERE o.provider = $1 AND o.provider_account_id = $2`,
       [provider, profile.id],
     );
-    if (linked.rows[0]) return linked.rows[0];
+    if (linked.rows[0]) {
+      if (!linked.rows[0].is_active) throw new HttpError(403, "account_disabled");
+      await client.query("UPDATE users SET last_login_at = now() WHERE id = $1", [linked.rows[0].id]);
+      return linked.rows[0];
+    }
 
     if (!profile.email) throw new HttpError(400, "no_email");
 
     const existing = await client.query<OAuthUser>(
-      "SELECT id, name, role FROM users WHERE lower(email) = $1 FOR UPDATE",
+      "SELECT id, name, role, is_active FROM users WHERE lower(email) = $1 FOR UPDATE",
       [profile.email],
     );
     let user = existing.rows[0];
 
     if (user) {
+      if (!user.is_active) throw new HttpError(403, "account_disabled");
       if (!profile.emailVerified) throw new HttpError(409, "email_in_use");
     } else {
       const candidate = (profile.name.trim() || profile.email.split("@")[0]).slice(0, 80);
       const name = candidate.length >= 2 ? candidate : "Citizen";
       const created = await client.query<OAuthUser>(
-        `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, NULL) RETURNING id, name, role`,
+        `INSERT INTO users (email, name, password_hash) VALUES ($1, $2, NULL) RETURNING id, name, role, is_active`,
         [profile.email, name],
       );
       user = created.rows[0];
@@ -194,5 +200,6 @@ export const OAUTH_ERRORS: Record<string, string> = {
   state: "The sign-in session expired. Please try again.",
   no_email: "Your account did not share an email address, which MunFix needs. Allow email access or sign up with email instead.",
   email_in_use: "An account with this email already exists. Log in with your password instead.",
+  account_disabled: "This account has been deactivated. Please contact the city administrator.",
   failed: "Sign-in failed. Please try again or use email and password.",
 };

@@ -40,6 +40,12 @@ async function seedDemo(client: Client) {
     `INSERT INTO users (email, name, password_hash, role) VALUES ('demo.citizen@munfix.local', 'Demo Citizen', $1, 'citizen') RETURNING id`,
     [await bcrypt.hash("demo-password", 10)],
   );
+  for (const [email, name, role] of [
+    ["demo.moderator@munfix.local", "Demo Moderator", "moderator"],
+    ["demo.staff@munfix.local", "Demo Field Staff", "staff"],
+  ] as const) {
+    await client.query(`INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4)`, [email, name, await bcrypt.hash("demo-password", 10), role]);
+  }
   const admin = await client.query<{ id: string }>("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
   const userId = user.rows[0].id;
   const adminId = admin.rows[0]?.id ?? userId;

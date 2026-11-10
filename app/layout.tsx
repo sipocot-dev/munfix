@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import Link from "next/link";
 import Header from "@/components/Header";
 import { MUNICIPALITY } from "@/lib/config";
 
@@ -24,7 +25,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <main className="flex-1">{children}</main>
         <footer className="border-t border-slate-200 bg-white py-6 text-center text-sm text-slate-500">
-          MunFix · A community civic reporting platform for {MUNICIPALITY.name}, {MUNICIPALITY.province}
+          <p>MunFix · A community civic reporting platform for {MUNICIPALITY.name}, {MUNICIPALITY.province}</p>
+          <p className="mt-2 space-x-4">
+            <Link href="/privacy" className="hover:underline">Privacy</Link>
+            <Link href="/terms" className="hover:underline">Terms</Link>
+            <Link href="/data-deletion" className="hover:underline">Data deletion</Link>
+          </p>
         </footer>
       </body>
     </html>

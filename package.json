@@ -15,7 +15,8 @@
     "services:down": "docker compose down",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
     "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
-    "mail:test": "tsx --env-file-if-exists=.env scripts/mail-test.ts"
+    "mail:test": "tsx --env-file-if-exists=.env scripts/mail-test.ts",
+    "admin:create": "tsx --env-file-if-exists=.env scripts/create-admin.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1165.0",

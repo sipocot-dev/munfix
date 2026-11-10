@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ROLES } from "./permissions";
 import { STATUSES } from "./status";
 
 const email = z.string().trim().toLowerCase().email().max(254);
@@ -49,3 +50,37 @@ export function parseBbox(value: string | null): [number, number, number, number
   if (minLng > maxLng || minLat > maxLat) return undefined;
   return [minLng, minLat, maxLng, maxLat];
 }
+
+export const forgotSchema = z.object({ email });
+
+export const resetSchema = z.object({
+  token: z.string().min(20).max(200),
+  password: z.string().min(8, "Password must be at least 8 characters").max(128),
+});
+
+export const passwordChangeSchema = z.object({
+  currentPassword: z.string().max(128).optional(),
+  newPassword: z.string().min(8, "Password must be at least 8 characters").max(128),
+});
+
+export const profileSchema = z.object({ name: z.string().trim().min(2).max(80) });
+
+export const deleteAccountSchema = z.object({ confirm: z.literal("DELETE") });
+
+export const newUserSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  email,
+  role: z.enum(ROLES),
+  categoryIds: z.array(z.number().int().positive()).max(50).optional(),
+});
+
+export const userPatchSchema = z
+  .object({
+    name: z.string().trim().min(2).max(80),
+    role: z.enum(ROLES),
+    isActive: z.boolean(),
+    categoryIds: z.array(z.number().int().positive()).max(50),
+    resetPassword: z.literal(true),
+  })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "Nothing to change");

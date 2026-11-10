@@ -3,6 +3,7 @@ import { cached, invalidateReports, reportsVersion } from "./cache";
 import { isUuid, query, withTx } from "./db";
 import { HttpError } from "./errors";
 import { queueStatusEmail, triggerDrain } from "./notifications";
+import { allowedTransitions, canViewUnpublished, isStaffRole, viewableStatuses, type Role } from "./permissions";
 import type { Session } from "./session";
 import {
   CITIZEN_WITHDRAWABLE,
@@ -55,7 +56,7 @@ export interface ReportDetail extends ReportSummary {
   events: ReportEvent[];
   isOwner: boolean;
   canWithdraw: boolean;
-  /** Only populated for admins. */
+  /** Only populated for moderators and admins. */
   reporter?: { name: string; email: string };
   allowedTransitions?: Status[];
 }
@@ -63,6 +64,8 @@ export interface ReportDetail extends ReportSummary {
 export interface AdminReportRow extends ReportSummary {
   description: string;
   reporterName: string;
+  /** Status changes the current user's role may make on this report. */
+  allowed: Status[];
 }
 
 export interface Stats {
@@ -199,6 +202,7 @@ export async function getStats(): Promise<Stats> {
 interface DetailRow extends SummaryRow {
   description: string;
   user_id: string;
+  category_id: number;
   duplicate_of: string | null;
   published_at: Date | null;
   updated_at: Date;
@@ -206,16 +210,27 @@ interface DetailRow extends SummaryRow {
   reporter_email: string;
 }
 
+/** A user still holding a temporary password has no elevated rights until they change it. */
+function effectiveRole(viewer: Session | null): Role | null {
+  if (!viewer) return null;
+  return viewer.mustChangePassword ? "citizen" : viewer.role;
+}
+
+/** Categories a field-staff user is limited to, or null when they cover every category. */
+function scopeFrom(rows: { category_id: number }[]): number[] | null {
+  return rows.length > 0 ? rows.map((r) => Number(r.category_id)) : null;
+}
+
 /**
  * Returns the report if the viewer is allowed to see it: public statuses are
- * visible to everyone, anything else only to the owner and admins.
+ * visible to everyone, anything else only to the owner, moderators and admins.
  * Returns null (not 403) otherwise so unpublished reports aren't discoverable.
  */
 export async function getReportDetail(id: string, viewer: Session | null): Promise<ReportDetail | null> {
   if (!isUuid(id)) return null;
 
   const [row] = await query<DetailRow>(
-    `SELECT ${SUMMARY_COLUMNS}, r.description, r.user_id, r.duplicate_of, r.published_at, r.updated_at,
+    `SELECT ${SUMMARY_COLUMNS}, r.description, r.user_id, r.category_id, r.duplicate_of, r.published_at, r.updated_at,
             u.name AS reporter_name, u.email AS reporter_email
        FROM reports r
        JOIN categories c ON c.id = r.category_id
@@ -225,9 +240,11 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
   );
   if (!row) return null;
 
-  const isAdmin = viewer?.role === "admin";
+  const role = effectiveRole(viewer);
+  const privileged = canViewUnpublished(role);
+  const staffViewer = isStaffRole(role);
   const isOwner = viewer?.userId === row.user_id;
-  if (!isPublicStatus(row.status) && !isOwner && !isAdmin) return null;
+  if (!isPublicStatus(row.status) && !isOwner && !privileged) return null;
 
   const media = await query<{ id: string; path: string }>(
     "SELECT id, path FROM report_media WHERE report_id = $1 ORDER BY created_at",
@@ -250,7 +267,7 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
   );
 
   // The public only sees the part of the history that happened after publication.
-  const visibleEvents = events.filter((e) => isOwner || isAdmin || isPublicStatus(e.to_status));
+  const visibleEvents = events.filter((e) => isOwner || privileged || isPublicStatus(e.to_status));
 
   const detail: ReportDetail = {
     ...toSummary(row),
@@ -265,15 +282,23 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
       toStatus: e.to_status,
       note: e.note,
       createdAt: e.created_at.toISOString(),
-      actorName: isAdmin ? e.actor_name : null,
+      actorName: staffViewer ? e.actor_name : null,
     })),
     isOwner,
     canWithdraw: isOwner && CITIZEN_WITHDRAWABLE.includes(row.status),
   };
 
-  if (isAdmin) {
-    detail.reporter = { name: row.reporter_name, email: row.reporter_email };
-    detail.allowedTransitions = [...TRANSITIONS[row.status]];
+  if (privileged) detail.reporter = { name: row.reporter_name, email: row.reporter_email };
+
+  if (staffViewer && viewer) {
+    let allowed = allowedTransitions(role, row.status);
+    if (role === "staff") {
+      const scope = scopeFrom(
+        await query<{ category_id: number }>("SELECT category_id FROM user_categories WHERE user_id = $1", [viewer.userId]),
+      );
+      if (scope && !scope.includes(row.category_id)) allowed = [];
+    }
+    detail.allowedTransitions = allowed;
   }
   return detail;
 }
@@ -387,21 +412,34 @@ export async function updateOwnReport(id: string, userId: string, edit: ReportEd
 
 /* ----------------------------- Admin operations ----------------------------- */
 
-export async function listAdminReports(statuses: Status[], limit = 200): Promise<AdminReportRow[]> {
+export async function listAdminReports(statuses: Status[], viewer: Session, limit = 200): Promise<AdminReportRow[]> {
+  const role = effectiveRole(viewer);
+  // Never return more than the role may see, whatever the caller asked for.
+  const visible = viewableStatuses(role);
+  const wanted = statuses.filter((st) => visible.includes(st));
+  if (wanted.length === 0) return [];
+
+  const scope =
+    role === "staff"
+      ? scopeFrom(await query<{ category_id: number }>("SELECT category_id FROM user_categories WHERE user_id = $1", [viewer.userId]))
+      : null;
+
   const rows = await query<SummaryRow & { description: string; reporter_name: string }>(
     `SELECT ${SUMMARY_COLUMNS}, r.description, u.name AS reporter_name
        FROM reports r
        JOIN categories c ON c.id = r.category_id
        JOIN users u ON u.id = r.user_id
       WHERE r.status = ANY($1::text[])
+        AND ($3::int[] IS NULL OR r.category_id = ANY($3::int[]))
       ORDER BY r.created_at DESC
       LIMIT $2`,
-    [statuses, Math.min(Math.max(limit, 1), 500)],
+    [wanted, Math.min(Math.max(limit, 1), 500), scope],
   );
   return rows.map((row) => ({
     ...toSummary(row),
     description: row.description,
-    reporterName: row.reporter_name,
+    reporterName: role === "staff" ? "Hidden" : row.reporter_name,
+    allowed: allowedTransitions(role, row.status),
   }));
 }
 
@@ -415,12 +453,27 @@ export async function transitionReport(
   if (!isUuid(id)) throw new HttpError(404, "Report not found");
 
   const result = await withTx(async (client) => {
-    const res = await client.query<{ status: Status }>("SELECT status FROM reports WHERE id = $1 FOR UPDATE", [id]);
+    const res = await client.query<{ status: Status; category_id: number }>(
+      "SELECT status, category_id FROM reports WHERE id = $1 FOR UPDATE",
+      [id],
+    );
     const current = res.rows[0]?.status;
     if (!current) throw new HttpError(404, "Report not found");
 
     if (!TRANSITIONS[current].includes(to)) {
       throw new HttpError(409, `Cannot move a report from "${current}" to "${to}"`);
+    }
+    // The state machine allows it; now check this user's role does too.
+    if (!allowedTransitions(effectiveRole(actor), current).includes(to)) {
+      throw new HttpError(403, "Your role cannot make this change");
+    }
+    if (actor.role === "staff") {
+      const scope = scopeFrom(
+        (await client.query<{ category_id: number }>("SELECT category_id FROM user_categories WHERE user_id = $1", [actor.userId])).rows,
+      );
+      if (scope && !scope.includes(res.rows[0].category_id)) {
+        throw new HttpError(403, "This report is outside your assigned categories");
+      }
     }
     if (to === "rejected" && !note) {
       throw new HttpError(400, "A reason is required when rejecting a report");
@@ -507,7 +560,7 @@ export async function canViewMedia(
   );
   if (!row) return { allowed: false, isPublic: false };
   const isPublic = isPublicStatus(row.status);
-  const allowed = isPublic || viewer?.role === "admin" || viewer?.userId === row.user_id;
+  const allowed = isPublic || canViewUnpublished(effectiveRole(viewer)) || viewer?.userId === row.user_id;
   return { allowed, isPublic };
 }
 

@@ -8,6 +8,7 @@ import TransitionControls from "@/components/TransitionControls";
 import WithdrawButton from "@/components/WithdrawButton";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { getReportDetail } from "@/lib/reports";
+import { canViewUnpublished, isStaffRole } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
 import { STATUS_LABEL, isPublicStatus } from "@/lib/status";
 
@@ -24,7 +25,7 @@ export default async function ReportPage({ params }: Props) {
   const report = await getReportDetail(id, session);
   if (!report) notFound();
 
-  const isAdmin = session?.role === "admin";
+  const privileged = canViewUnpublished(session?.role);
   const hidden = !isPublicStatus(report.status);
   const closed = report.status === "rejected" || report.status === "duplicate" || report.status === "withdrawn";
 
@@ -45,7 +46,7 @@ export default async function ReportPage({ params }: Props) {
 
       {hidden && !closed && (
         <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          This report is only visible to {isAdmin && !report.isOwner ? "you and the reporter" : "you and city staff"} until it has been verified.
+          This report is only visible to {privileged && !report.isOwner ? "you and the reporter" : "you and city staff"} until it has been verified.
         </p>
       )}
       {report.status === "duplicate" && (
@@ -109,9 +110,9 @@ export default async function ReportPage({ params }: Props) {
         <aside className="space-y-6">
           <StaticMap lng={report.lng} lat={report.lat} status={report.status} />
 
-          {isAdmin && report.allowedTransitions && (
+          {isStaffRole(session?.role) && report.allowedTransitions && (
             <section className="card space-y-3 p-5">
-              <h2 className="text-lg font-semibold">Moderation</h2>
+              <h2 className="text-lg font-semibold">{session?.role === "staff" ? "Field work" : "Moderation"}</h2>
               {report.reporter && (
                 <p className="text-sm text-slate-600">
                   Reported by <span className="font-medium">{report.reporter.name}</span> ({report.reporter.email})

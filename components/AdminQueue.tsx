@@ -4,20 +4,13 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import type { AdminReportRow } from "@/lib/reports";
 import { formatDate } from "@/lib/format";
-import { TRANSITIONS, type Status } from "@/lib/status";
+import type { QueueTab } from "@/lib/permissions";
 import StatusBadge from "./StatusBadge";
 import TransitionControls from "./TransitionControls";
 
-const TABS: { key: string; label: string; statuses: Status[] }[] = [
-  { key: "queue", label: "Needs review", statuses: ["submitted", "under_review"] },
-  { key: "verified", label: "Verified", statuses: ["verified"] },
-  { key: "in_progress", label: "In progress", statuses: ["in_progress"] },
-  { key: "resolved", label: "Resolved", statuses: ["resolved"] },
-  { key: "closed", label: "Rejected / duplicate", statuses: ["rejected", "duplicate"] },
-];
-
-export default function AdminQueue({ initial }: { initial: AdminReportRow[] }) {
-  const [tab, setTab] = useState("queue");
+export default function AdminQueue({ initial, tabs }: { initial: AdminReportRow[]; tabs: QueueTab[] }) {
+  const TABS = tabs;
+  const [tab, setTab] = useState(tabs[0].key);
   const [rows, setRows] = useState(initial);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -36,7 +29,7 @@ export default function AdminQueue({ initial }: { initial: AdminReportRow[] }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [TABS]);
 
   function switchTab(key: string) {
     setTab(key);
@@ -90,7 +83,7 @@ export default function AdminQueue({ initial }: { initial: AdminReportRow[] }) {
                 <img src={r.thumb} alt="" className="mt-3 h-20 rounded-lg object-cover" />
               )}
               <div className="mt-3 border-t border-slate-100 pt-3">
-                <TransitionControls id={r.id} allowed={[...TRANSITIONS[r.status]]} onDone={() => load(tab)} />
+                <TransitionControls id={r.id} allowed={r.allowed} onDone={() => load(tab)} />
               </div>
             </li>
           ))}

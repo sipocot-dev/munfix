@@ -7,14 +7,13 @@ import { query } from "@/lib/db";
 import { mailEnabled } from "@/lib/mail";
 import { formatDate } from "@/lib/format";
 import { listUserReports } from "@/lib/reports";
-import { getSession } from "@/lib/session";
+import { requirePageRole } from "@/lib/guards";
 import { isPublicStatus } from "@/lib/status";
 
 export const metadata: Metadata = { title: "My reports" };
 
 export default async function MyReportsPage() {
-  const session = await getSession();
-  if (!session) redirect("/login?next=/me");
+  const session = await requirePageRole("/me");
   const reports = await listUserReports(session.userId);
   const [prefs] = mailEnabled()
     ? await query<{ email_notifications: boolean }>("SELECT email_notifications FROM users WHERE id = $1", [session.userId])

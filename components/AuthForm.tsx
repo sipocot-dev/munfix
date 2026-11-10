@@ -63,7 +63,8 @@ export default function AuthForm({
         setError(apiError(data));
         return;
       }
-      router.push(data.role === "admin" && target === "/" ? "/admin" : target);
+      if (data.mustChangePassword) router.push("/account?reason=password");
+      else router.push(["admin", "moderator", "staff"].includes(data.role) && target === "/" ? "/admin" : target);
       router.refresh();
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
@@ -124,6 +125,11 @@ export default function AuthForm({
               className="field mt-1"
             />
             {!isLogin && <span className="mt-1 block text-xs font-normal text-slate-500">At least 8 characters.</span>}
+            {isLogin && (
+              <Link href="/forgot-password" className="mt-1 inline-block text-xs font-semibold text-teal-700 hover:underline">
+                Forgot your password?
+              </Link>
+            )}
           </label>
 
           {error && (

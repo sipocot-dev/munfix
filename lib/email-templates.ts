@@ -133,3 +133,34 @@ export function statusEmail(i: Input): { subject: string; text: string; html: st
 
   return { subject: `[MunFix] ${c.subject}`, text, html };
 }
+
+export function resetEmail(i: { name: string; url: string; minutes: number }): { subject: string; text: string; html: string } {
+  const text = [
+    `Hi ${i.name},`,
+    "",
+    `We received a request to reset your MunFix ${MUNICIPALITY.name} password. Open this link to choose a new one (valid for ${i.minutes} minutes):`,
+    "",
+    i.url,
+    "",
+    "If you did not ask for this, you can ignore this email. Your password will not change.",
+    "",
+    `— MunFix ${MUNICIPALITY.name}`,
+  ].join("\n");
+
+  const html = `<!doctype html>
+<html><body style="margin:0;background:#f8fafc;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#0f172a">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">
+      <tr><td style="padding:24px">
+        <div style="font-size:13px;font-weight:700;color:#0f766e">MunFix ${escapeHtml(MUNICIPALITY.name)}</div>
+        <h1 style="margin:12px 0;font-size:20px">Reset your password</h1>
+        <p style="margin:0 0 12px;font-size:15px">Hi ${escapeHtml(i.name)},</p>
+        <p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#334155">We received a request to reset your password. This link is valid for ${i.minutes} minutes.</p>
+        <a href="${escapeHtml(i.url)}" style="display:inline-block;padding:10px 18px;background:#0f766e;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">Choose a new password</a>
+        <p style="margin:16px 0 0;font-size:12px;color:#64748b">If you did not ask for this, ignore this email. Your password will not change.</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+  return { subject: "[MunFix] Reset your password", text, html };
+}

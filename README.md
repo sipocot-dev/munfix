@@ -114,10 +114,41 @@ Set `OAUTH_<PROVIDER>_CLIENT_ID` and `_CLIENT_SECRET` and the "Continue with Goo
 <APP_URL>/api/v1/auth/oauth/facebook/callback
 ```
 
+- For munfix.bettersipocot.org the URIs are `https://munfix.bettersipocot.org/api/v1/auth/oauth/google/callback` and `.../facebook/callback` (also listed on **Admin → System**).
+- Google: Cloud Console → APIs & Services → Credentials → OAuth client ID (Web); set the consent screen's privacy policy to `/privacy`. Facebook: developers.facebook.com → app with Facebook Login; set Privacy Policy URL `/privacy` and Data Deletion Instructions URL `/data-deletion`.
 - Google needs the `openid email profile` scopes; Facebook needs `email` and `public_profile`.
-- A provider account that has never signed in creates a new citizen. Admin accounts are only created by the seed script.
+- A provider account that has never signed in creates a new citizen. Provider sign-in never creates or promotes staff; administrators are created by the seed/`admin:create` or by another administrator.
 - **Account linking:** a *verified* Google email that matches an existing account links to it. Facebook does not guarantee that the user owns an address, so a Facebook email that matches an existing account is refused (the user logs in with their password instead). This prevents account takeover.
 - The flow uses a one-time `state` cookie for CSRF protection. Accounts created via a provider have no password.
+
+## Roles and administrator accounts
+
+| Role | Can do |
+| --- | --- |
+| **Citizen** | Report problems, follow and withdraw their own reports, manage their account. |
+| **Moderator** | Review new reports: start review, verify & publish, reject (with reason), mark duplicate. Sees reporters and the overview. |
+| **Field staff** | Works published reports only: mark *in progress* and *resolved*. Can be limited to certain categories (none selected = all). Never sees unreviewed reports or reporter identities. |
+| **Administrator** | Everything above, plus users and roles, the audit log (reports and account changes) and the System page. |
+
+Every status change and account change is written to the audit log. The server enforces all of this; hiding buttons is only a convenience.
+
+**Administrator credentials**
+
+- The first administrator is created on startup from `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`. In production a weak or default password is refused (12+ characters, not a common password). The account must change its password at first login.
+- To create or recover an administrator from the server (no web access needed):
+
+  ```bash
+  npm run admin:create -- --email you@example.com --name "Your Name"
+  npm run admin:create -- --email you@example.com --reset   # new password for an existing account
+  ```
+
+  It prints a random password once; the account is forced to choose a new one at first login and all its sessions are revoked.
+- Administrators create moderator/staff accounts on **Admin → Users**; a one-time temporary password is shown once and must be changed at first login.
+- Safeguards: you cannot change your own role or deactivate yourself, and the last active administrator can never be demoted or disabled. Role, deactivation and password changes sign the person out everywhere immediately.
+- Citizens can reset a forgotten password by email (needs SMTP) and delete their own account (anonymised; staff accounts must be demoted first).
+- `SEED_DEMO=true` also creates `demo.moderator@munfix.local` and `demo.staff@munfix.local` (password `demo-password`). Never enable it in production.
+
+Pages: `/admin` (work queue), `/admin/overview` (charts), `/admin/users`, `/admin/audit`, `/admin/system` (service health, email test, exact OAuth redirect URIs), `/account`, `/forgot-password`, and the `/privacy`, `/terms`, `/data-deletion` pages that Google and Facebook require for app review.
 
 ## API
 
