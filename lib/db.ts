@@ -14,12 +14,42 @@ export const pool: Pool =
 
 if (process.env.NODE_ENV !== "production") g.__pgPool = pool;
 
+/** Postgres "undefined table" / "undefined column": the schema is behind the code. */
+function isSchemaBehind(err: unknown): boolean {
+  const code = typeof err === "object" && err !== null ? (err as { code?: string }).code : undefined;
+  return code === "42P01" || code === "42703";
+}
+
+let healing: Promise<void> | null = null;
+let lastHeal = 0;
+
+/** Applies pending migrations once (at most every 30 s) when a query shows the schema is out of date. */
+async function healSchema(): Promise<boolean> {
+  if (process.env.AUTO_SETUP === "false" || !process.env.DATABASE_URL) return false;
+  if (!healing) {
+    if (Date.now() - lastHeal < 30_000) return false;
+    lastHeal = Date.now();
+    healing = import("./setup")
+      .then(({ ensureDatabaseReady }) => ensureDatabaseReady(pool, (m) => console.log(`[setup] ${m}`)))
+      .catch((e) => console.error("[setup] self-heal failed:", e instanceof Error ? e.message : e))
+      .finally(() => {
+        healing = null;
+      });
+  }
+  await healing;
+  return true;
+}
+
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params: unknown[] = [],
 ): Promise<T[]> {
-  const res = await pool.query<T>(text, params);
-  return res.rows;
+  try {
+    return (await pool.query<T>(text, params)).rows;
+  } catch (err) {
+    if (isSchemaBehind(err) && (await healSchema())) return (await pool.query<T>(text, params)).rows;
+    throw err;
+  }
 }
 
 export async function withTx<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
