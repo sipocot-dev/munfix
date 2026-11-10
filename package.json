@@ -14,7 +14,8 @@
     "services:up": "docker compose up -d db redis",
     "services:down": "docker compose down",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
-    "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts"
+    "db:seed": "tsx --env-file-if-exists=.env scripts/seed.ts",
+    "mail:test": "tsx --env-file-if-exists=.env scripts/mail-test.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1165.0",
@@ -22,6 +23,7 @@
     "ioredis": "^5.4.1",
     "maplibre-gl": "^5.0.0",
     "next": "^15.5.0",
+    "nodemailer": "^10.4.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -30,6 +32,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.0.0",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.11.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

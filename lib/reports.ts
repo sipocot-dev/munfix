@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { cached, invalidateReports, reportsVersion } from "./cache";
 import { isUuid, query, withTx } from "./db";
 import { HttpError } from "./errors";
+import { queueStatusEmail, triggerDrain } from "./notifications";
 import type { Session } from "./session";
 import {
   CITIZEN_WITHDRAWABLE,
@@ -305,8 +306,10 @@ export async function createReport(userId: string, input: NewReport, mediaFiles:
       await client.query("INSERT INTO report_media (report_id, path) VALUES ($1, $2)", [reportId, path]);
     }
     await insertEvent(client, reportId, userId, null, "submitted", null);
+    await queueStatusEmail(client, reportId, null, "submitted", null);
     return reportId;
   });
+  triggerDrain();
   return id;
 }
 
@@ -440,10 +443,12 @@ export async function transitionReport(
       [id, to, duplicateOf ?? null],
     );
     await insertEvent(client, id, actor.userId, current, to, note ?? null);
+    await queueStatusEmail(client, id, current, to, note ?? null);
     return { id, status: to };
   });
 
   await invalidateReports();
+  triggerDrain();
   return result;
 }
 

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import NotificationToggle from "@/components/NotificationToggle";
 import StatusBadge from "@/components/StatusBadge";
+import { query } from "@/lib/db";
+import { mailEnabled } from "@/lib/mail";
 import { formatDate } from "@/lib/format";
 import { listUserReports } from "@/lib/reports";
 import { getSession } from "@/lib/session";
@@ -13,6 +16,9 @@ export default async function MyReportsPage() {
   const session = await getSession();
   if (!session) redirect("/login?next=/me");
   const reports = await listUserReports(session.userId);
+  const [prefs] = mailEnabled()
+    ? await query<{ email_notifications: boolean }>("SELECT email_notifications FROM users WHERE id = $1", [session.userId])
+    : [];
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -22,6 +28,8 @@ export default async function MyReportsPage() {
           New report
         </Link>
       </div>
+
+      {prefs && <NotificationToggle initial={prefs.email_notifications} />}
 
       {reports.length === 0 ? (
         <div className="card p-10 text-center">

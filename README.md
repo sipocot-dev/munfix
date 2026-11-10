@@ -26,6 +26,7 @@ submitted → under_review → verified → in_progress → resolved
 | Redis | Sessions (7-day, hashed token), read-through cache for map/stats queries, rate limiting |
 | Maps | MapLibre GL with raster tiles (OpenStreetMap by default) |
 | Auth | Email + password (bcrypt) and optional Google / Facebook sign-in, httpOnly cookie, roles: `citizen`, `admin` |
+| Email | SMTP via Nodemailer (any provider), sent from a Postgres outbox with automatic retries |
 | Photos | Validated by magic bytes; stored on local disk or any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, B2); always served through an access-checked route |
 
 Redis is an optimisation, not a dependency of correctness for reads: if it is down the cache is bypassed and the database answers directly.
@@ -63,12 +64,26 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 | `STORAGE_DRIVER` | `local` (default) or `s3` |
 | `UPLOAD_DIR` | Photo directory for the `local` driver (use a persistent volume) |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PREFIX` | `s3` driver settings. R2: `S3_REGION=auto` and its account endpoint. MinIO: `S3_FORCE_PATH_STYLE=true` |
+| `SMTP_URL` or `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`, `MAIL_FROM` | Email notifications (see below). Unset = email disabled |
 | `OAUTH_GOOGLE_*`, `OAUTH_FACEBOOK_*` | `CLIENT_ID` / `CLIENT_SECRET` for social sign-in (see below) |
 | `NEXT_PUBLIC_MAP_CENTER_*` | Initial map center (Sipocot by default) |
 | `NEXT_PUBLIC_MAP_BOUNDS` | `minLng,minLat,maxLng,maxLat` — reports must be pinned inside this box |
 | `NEXT_PUBLIC_MAP_TILE_URL` | Tile template. The public OSM server is for development only; use a tile provider in production |
 
 The municipality is configuration, not code: change the name, province, center and bounds to deploy for another city.
+
+## Email notifications
+
+Set `SMTP_URL` (or `SMTP_HOST` and friends) and `MAIL_FROM`, then check it with `npm run mail:test -- you@example.com`. Any SMTP provider works: Amazon SES, Brevo, Mailgun, Resend, Gmail with an app password, and so on. With no SMTP settings, email is off and the rest of the app is unaffected.
+
+Reporters are emailed when their report is **received**, **verified**, **started**, **resolved** (or **reopened**), **rejected** (with the reason), or **merged as a duplicate**. Moving a report to "under review" sends nothing, and withdrawing sends nothing. Staff notes appear in the email. Reporters can turn emails off from **My reports**.
+
+How delivery works:
+- The email is written to an `email_outbox` table **in the same transaction** as the status change, so a notification is never lost and never sent for a change that rolled back.
+- It is sent right after the change commits. If the mail server is down, the change still succeeds, and a background worker retries with growing delays (2, 4, 8 … up to 60 minutes) and gives up after 8 attempts. Failures are visible in `email_outbox.last_error`.
+- Several app instances can run at once: rows are claimed with `FOR UPDATE SKIP LOCKED`, so each email is sent once. Sent rows are deleted after 30 days.
+- All user-supplied text (names, titles, notes) is HTML-escaped.
+- Emails carry a link to turn them off in **My reports**, not a one-click unsubscribe header.
 
 ## Social sign-in
 
@@ -120,7 +135,8 @@ app/                 Pages and API route handlers
 components/          Map, forms, moderation controls
 lib/                 Database, Redis, sessions, caching, rate limits, report logic
 db/migrations/       SQL migrations (applied in order, tracked in schema_migrations)
-scripts/             migrate.ts and seed.ts
+scripts/             migrate.ts, seed.ts and mail-test.ts
+instrumentation.ts    Starts the email retry worker with the server
 ```
 
 ## Notes
