@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: munfix
+      POSTGRES_PASSWORD: munfix
+      POSTGRES_DB: munfix
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U munfix -d munfix"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Full stack in containers: docker compose --profile full up --build
+  app:
+    profiles: ["full"]
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_MUNICIPALITY_NAME: ${NEXT_PUBLIC_MUNICIPALITY_NAME:-Iligan City}
+        NEXT_PUBLIC_PROVINCE_NAME: ${NEXT_PUBLIC_PROVINCE_NAME:-Lanao del Norte}
+        NEXT_PUBLIC_MAP_CENTER_LNG: ${NEXT_PUBLIC_MAP_CENTER_LNG:-124.2452}
+        NEXT_PUBLIC_MAP_CENTER_LAT: ${NEXT_PUBLIC_MAP_CENTER_LAT:-8.2280}
+        NEXT_PUBLIC_MAP_BOUNDS: ${NEXT_PUBLIC_MAP_BOUNDS:-123.95,7.90,124.45,8.40}
+        NEXT_PUBLIC_MAP_TILE_URL: ${NEXT_PUBLIC_MAP_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+    environment:
+      DATABASE_URL: postgres://munfix:munfix@db:5432/munfix
+      REDIS_URL: redis://redis:6379
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      UPLOAD_DIR: /data/uploads
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-admin@munfix.local}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-change-me-please}
+    ports:
+      - "3000:3000"
+    volumes:
+      - uploads:/data/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  redisdata:
+  uploads:
