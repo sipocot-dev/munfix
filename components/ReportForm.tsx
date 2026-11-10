@@ -122,7 +122,7 @@ export default function ReportForm({ categories }: { categories: Category[] }) {
           </label>
           <label className="block text-sm font-medium">
             Landmark or street <span className="font-normal text-slate-500">(optional)</span>
-            <input name="address" maxLength={200} placeholder="e.g. Near Tibanga Elementary School" className="field mt-1" />
+            <input name="address" maxLength={200} placeholder="e.g. Near the public market" className="field mt-1" />
           </label>
         </div>
       </section>

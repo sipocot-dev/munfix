@@ -1,8 +1,8 @@
-# MunFix · Iligan City
+# MunFix · Sipocot
 
-A civic reporting platform for Iligan City that enables citizens to report infrastructure issues, view them on a map, and track resolution progress.
+A civic reporting platform for Sipocot, Camarines Sur that enables citizens to report infrastructure issues, view them on a map, and track resolution progress.
 
-Inspired by [CitiFix / BetterIligan](https://github.com/KishonShrill/CitiFix), rebuilt on **Next.js + PostgreSQL + Redis** with no third-party services required: photos are stored on disk, sessions live in Redis, and the map uses open tiles.
+Inspired by [CitiFix](https://github.com/KishonShrill/CitiFix), rebuilt on **Next.js + PostgreSQL + Redis** with no third-party services required: photos are stored on disk, sessions live in Redis, and the map uses open tiles.
 
 ## How it works
 
@@ -64,7 +64,7 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 | `UPLOAD_DIR` | Photo directory for the `local` driver (use a persistent volume) |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PREFIX` | `s3` driver settings. R2: `S3_REGION=auto` and its account endpoint. MinIO: `S3_FORCE_PATH_STYLE=true` |
 | `OAUTH_GOOGLE_*`, `OAUTH_FACEBOOK_*` | `CLIENT_ID` / `CLIENT_SECRET` for social sign-in (see below) |
-| `NEXT_PUBLIC_MAP_CENTER_*` | Initial map center (Iligan City by default) |
+| `NEXT_PUBLIC_MAP_CENTER_*` | Initial map center (Sipocot by default) |
 | `NEXT_PUBLIC_MAP_BOUNDS` | `minLng,minLat,maxLng,maxLat` — reports must be pinned inside this box |
 | `NEXT_PUBLIC_MAP_TILE_URL` | Tile template. The public OSM server is for development only; use a tile provider in production |
 
@@ -126,5 +126,5 @@ scripts/             migrate.ts and seed.ts
 ## Notes
 
 - Rate limits (Redis): 5 sign-ups/hour/IP, login attempts per IP and per email, 10 reports/hour/user.
-- The barangay field suggests Iligan City barangays but accepts any text.
+- The barangay field suggests the 46 barangays of Sipocot but accepts any text.
 - Photos default to local disk. Running more than one app instance? Use `STORAGE_DRIVER=s3`. Existing local photos are not migrated automatically; copy the files in `UPLOAD_DIR` into the bucket under the same names.

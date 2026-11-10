@@ -52,7 +52,7 @@ export const POST = route(async (req) => {
 
   const input = reportSchema.parse(raw);
   if (!withinBounds(input.lng, input.lat)) {
-    throw new HttpError(400, "The selected location is outside Iligan City");
+    throw new HttpError(400, "The selected location is outside Sipocot");
   }
 
   const stored = await saveImages(files);

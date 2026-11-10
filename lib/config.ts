@@ -15,13 +15,13 @@ function parseBounds(value: string | undefined, center: [number, number]): [numb
 }
 
 const center: [number, number] = [
-  num(process.env.NEXT_PUBLIC_MAP_CENTER_LNG, 124.2452),
-  num(process.env.NEXT_PUBLIC_MAP_CENTER_LAT, 8.2280),
+  num(process.env.NEXT_PUBLIC_MAP_CENTER_LNG, 122.9833),
+  num(process.env.NEXT_PUBLIC_MAP_CENTER_LAT, 13.7667),
 ];
 
 export const MUNICIPALITY = {
-  name: process.env.NEXT_PUBLIC_MUNICIPALITY_NAME ?? "Iligan City",
-  province: process.env.NEXT_PUBLIC_PROVINCE_NAME ?? "Lanao del Norte",
+  name: process.env.NEXT_PUBLIC_MUNICIPALITY_NAME ?? "Sipocot",
+  province: process.env.NEXT_PUBLIC_PROVINCE_NAME ?? "Camarines Sur",
   center,
   /** [minLng, minLat, maxLng, maxLat] */
   bounds: parseBounds(process.env.NEXT_PUBLIC_MAP_BOUNDS, center),

@@ -2,7 +2,7 @@
   "name": "munfix",
   "version": "0.1.0",
   "private": true,
-  "description": "MunFix — a civic reporting platform for Iligan City: citizens report infrastructure issues, see them on a map, and track resolution progress.",
+  "description": "MunFix — a civic reporting platform for Sipocot, Camarines Sur: citizens report infrastructure issues, see them on a map, and track resolution progress.",
   "engines": {
     "node": ">=22"
   },

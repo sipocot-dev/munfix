@@ -82,12 +82,12 @@ async function seedDemo(client: Client) {
   const adminId = admin.rows[0]?.id ?? userId;
 
   const demo: [cat: string, title: string, description: string, dLng: number, dLat: number, status: string, barangay: string][] = [
-    ["roads", "Large pothole near the public market", "A deep pothole has formed on the main road next to the Tibanga market entrance and is a hazard for tricycles and motorcycles.", 0.004, 0.002, "verified", "Tibanga"],
-    ["streetlights", "Streetlight out along the highway", "The streetlight in front of the elementary school has been out for two weeks. The crossing is very dark at night.", -0.006, 0.004, "in_progress", "Tibanga"],
-    ["drainage", "Clogged canal causes flooding", "The roadside canal is blocked with debris, and the street floods even after light rain.", 0.009, -0.003, "resolved", "Pala-o"],
-    ["garbage", "Uncollected garbage at the corner", "Garbage has not been collected in over a week and is attracting stray animals.", -0.003, -0.006, "verified", "Pala-o"],
-    ["bridges", "Damaged railing on footbridge", "The railing on the footbridge is broken and children cross here every day on the way to school.", 0.012, 0.008, "in_progress", "Mandulog"],
-    ["water", "Leaking water main", "Water has been spilling onto the road from a broken pipe for several days.", -0.011, -0.002, "submitted", "Mandulog"],
+    ["roads", "Large pothole near the public market", "A deep pothole has formed on the main road next to the market entrance and is a hazard for tricycles and motorcycles.", 0.004, 0.002, "verified", "North Centro"],
+    ["streetlights", "Streetlight out along the highway", "The streetlight in front of the elementary school has been out for two weeks. The crossing is very dark at night.", -0.006, 0.004, "in_progress", "North Centro"],
+    ["drainage", "Clogged canal causes flooding", "The roadside canal is blocked with debris, and the street floods even after light rain.", 0.009, -0.003, "resolved", "South Centro"],
+    ["garbage", "Uncollected garbage at the corner", "Garbage has not been collected in over a week and is attracting stray animals.", -0.003, -0.006, "verified", "South Centro"],
+    ["bridges", "Damaged railing on footbridge", "The railing on the footbridge is broken and children cross here every day on the way to school.", 0.012, 0.008, "in_progress", "Salvacion"],
+    ["water", "Leaking water main", "Water has been spilling onto the road from a broken pipe for several days.", -0.011, -0.002, "submitted", "Salvacion"],
   ];
 
   for (const [cat, title, description, dLng, dLat, status, barangay] of demo) {
