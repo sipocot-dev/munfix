@@ -1,51 +1,14 @@
 import bcrypt from "bcryptjs";
 import type { PoolClient } from "pg";
 import { pool } from "../lib/db";
-
-const CATEGORIES: [slug: string, name: string, description: string][] = [
-  ["roads", "Roads & potholes", "Potholes, cracks, damaged pavement, missing manhole covers"],
-  ["streetlights", "Streetlights", "Broken, flickering or missing streetlights"],
-  ["drainage", "Drainage & flooding", "Clogged canals, flooded streets, damaged culverts"],
-  ["garbage", "Garbage & sanitation", "Uncollected waste, illegal dumping, overflowing bins"],
-  ["water", "Water supply", "Leaks, no water, broken pipes or hydrants"],
-  ["electricity", "Electricity", "Fallen poles, exposed or sagging wires"],
-  ["bridges", "Bridges & sidewalks", "Damaged bridges, railings, sidewalks and footpaths"],
-  ["signage", "Traffic signs & signals", "Missing, damaged or obstructed signs and signals"],
-  ["public-facilities", "Public facilities", "Parks, plazas, public markets, barangay halls"],
-  ["other", "Other", "Anything else that needs the city government's attention"],
-];
+import { seedEssentials } from "../lib/setup";
 
 async function main() {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
-    for (const [i, [slug, name, description]] of CATEGORIES.entries()) {
-      await client.query(
-        `INSERT INTO categories (slug, name, description, sort_order) VALUES ($1, $2, $3, $4)
-         ON CONFLICT (slug) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description, sort_order = EXCLUDED.sort_order`,
-        [slug, name, description, i],
-      );
-    }
-    console.log(`Seeded ${CATEGORIES.length} categories.`);
-
-    const email = (process.env.SEED_ADMIN_EMAIL ?? "").trim().toLowerCase();
-    const password = process.env.SEED_ADMIN_PASSWORD ?? "";
-    if (email && password) {
-      const exists = await client.query("SELECT 1 FROM users WHERE lower(email) = $1", [email]);
-      if (exists.rowCount === 0) {
-        await client.query(
-          `INSERT INTO users (email, name, password_hash, role) VALUES ($1, 'City Admin', $2, 'admin')`,
-          [email, await bcrypt.hash(password, 10)],
-        );
-        console.log(`Created admin user ${email}.`);
-        if (password === "change-me-please") {
-          console.warn("WARNING: the admin account uses the default password. Change SEED_ADMIN_PASSWORD before deploying.");
-        }
-      } else {
-        console.log(`Admin user ${email} already exists; leaving it unchanged.`);
-      }
-    }
+    await seedEssentials(client);
 
     if (process.env.SEED_DEMO === "true") {
       await seedDemo(client);

@@ -53,6 +53,25 @@ Run everything in containers instead:
 docker compose --profile full up --build
 ```
 
+## Deploying
+
+Run `npm run build` then `npm start` (or use the Dockerfile). Required environment variables: `DATABASE_URL`, `REDIS_URL`, `APP_URL` (your public `https://` URL), and `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` for the first admin. The `NEXT_PUBLIC_*` values are baked in at **build** time, so set them before building.
+
+On every start the app applies pending database migrations and seeds the categories and admin account, so a plain `npm start` against an empty database works. Set `AUTO_SETUP=false` if you prefer to run `npm run db:migrate` and `npm run db:seed` yourself.
+
+### Troubleshooting
+
+**"Application error: a server-side exception has occurred" / HTTP 500**: open `/api/health`. It reports, without exposing secrets, whether the database is reachable, whether migrations are applied, and whether Redis is up:
+
+| `/api/health` says | Fix |
+| --- | --- |
+| `database: error: DATABASE_URL is not set` | Set `DATABASE_URL` and restart |
+| `database: error: cannot connect (ECONNREFUSED / ENOTFOUND / 28P01 …)` | Wrong host, port, or credentials in `DATABASE_URL`; managed databases often need `?sslmode=require` |
+| `migrations: error: database is not set up` | Restart with `AUTO_SETUP` on, or run `npm run db:migrate` |
+| `redis: error: unreachable` | Pages still load, but login and sessions fail. Fix `REDIS_URL` |
+
+The server log has the full error and a matching `digest` reference (also shown to visitors as "Reference").
+
 ## Configuration
 
 See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at build time:
@@ -60,6 +79,7 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL`, `REDIS_URL` | Service connections |
+| `AUTO_SETUP` | `true` (default) migrates and seeds on startup; `false` to do it manually |
 | `APP_URL` | Public URL; `https://` marks session cookies `Secure` |
 | `STORAGE_DRIVER` | `local` (default) or `s3` |
 | `UPLOAD_DIR` | Photo directory for the `local` driver (use a persistent volume) |
@@ -127,7 +147,7 @@ All endpoints are under `/api/v1`. Errors are `{ "error": string }` (validation 
 ## Project layout
 
 ```
-app/                 Pages and API route handlers
+app/                 Pages and API route handlers (`api/health` for diagnostics)
   api/v1/            REST API
   admin/             Moderation queue and audit log
   reports/[id]/      Public report page with timeline
