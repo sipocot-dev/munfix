@@ -1,3 +1,4 @@
+import { realEnv } from "./env";
 import nodemailer, { type Transporter } from "nodemailer";
 import { MUNICIPALITY } from "./config";
 
@@ -6,11 +7,16 @@ import { MUNICIPALITY } from "./config";
  * Configure either SMTP_URL (e.g. smtps://user:pass@smtp.example.com:465) or SMTP_HOST + friends.
  */
 export function mailEnabled(): boolean {
-  return Boolean(process.env.SMTP_URL || process.env.SMTP_HOST);
+  if (realEnv("SMTP_URL")) return true;
+  if (!realEnv("SMTP_HOST")) return false;
+  // A username that is still template text means the account was never filled in: stay off.
+  if (process.env.SMTP_USER?.trim() && !realEnv("SMTP_USER")) return false;
+  if (realEnv("SMTP_USER") && !(realEnv("SMTP_PASSWORD") ?? realEnv("SMTP_PASS"))) return false;
+  return true;
 }
 
 export function mailFrom(): string {
-  const configured = process.env.MAIL_FROM || process.env.SMTP_FROM;
+  const configured = realEnv("MAIL_FROM") || realEnv("SMTP_FROM");
   if (configured) {
     // Accept `Name email@host` (no angle brackets) as well as the standard `Name <email@host>`.
     const loose = configured.trim().replace(/^"|"$/g, "").match(/^(.+?)\s+([^\s<>@]+@[^\s<>@]+)$/);
@@ -30,17 +36,17 @@ const g = globalThis as unknown as { __mailer?: Transporter };
 function transporter(): Transporter {
   if (g.__mailer) return g.__mailer;
   const common = { connectionTimeout: 10_000, greetingTimeout: 10_000, socketTimeout: 20_000 };
-  const url = process.env.SMTP_URL;
+  const url = realEnv("SMTP_URL");
   const port = Number(process.env.SMTP_PORT) || 587;
   g.__mailer = url
     ? nodemailer.createTransport({ ...common, url })
     : nodemailer.createTransport({
         ...common,
-        host: process.env.SMTP_HOST,
+        host: realEnv("SMTP_HOST"),
         port,
         // Implicit TLS on 465; other ports upgrade with STARTTLS when the server offers it.
         secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : port === 465,
-        auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD ?? process.env.SMTP_PASS ?? "" } : undefined,
+        auth: realEnv("SMTP_USER") ? { user: realEnv("SMTP_USER")!, pass: realEnv("SMTP_PASSWORD") ?? realEnv("SMTP_PASS") ?? "" } : undefined,
       });
   return g.__mailer;
 }

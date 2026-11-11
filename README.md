@@ -92,6 +92,8 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 
 The municipality is configuration, not code: change the name, province, center and bounds to deploy for another city.
 
+Optional settings left empty, or still holding template text such as `<your Gmail address>`, are treated as **not set**: the site runs normally and the matching feature (Facebook/Google button, email) simply stays off.
+
 ### Gmail SMTP
 
 ```

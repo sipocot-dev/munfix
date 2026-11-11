@@ -1,3 +1,4 @@
+import { realEnv } from "./env";
 import { HttpError } from "./errors";
 import { withTx } from "./db";
 import type { Role } from "./permissions";
@@ -25,7 +26,7 @@ interface ProviderConfig {
  */
 function config(provider: Provider): ProviderConfig {
   const P = provider.toUpperCase();
-  const env = (k: string) => process.env[`OAUTH_${P}_${k}`] || undefined;
+  const env = (k: string) => realEnv(`OAUTH_${P}_${k}`);
   const base =
     provider === "google"
       ? {
@@ -48,8 +49,8 @@ function config(provider: Provider): ProviderConfig {
     tokenUrl: env("TOKEN_URL") ?? base.tokenUrl,
     userUrl: env("USER_URL") ?? base.userUrl,
     // AUTH_<PROVIDER>_ID / _SECRET are accepted as aliases (Auth.js naming).
-    clientId: env("CLIENT_ID") ?? process.env[`AUTH_${P}_ID`] ?? undefined,
-    clientSecret: env("CLIENT_SECRET") ?? process.env[`AUTH_${P}_SECRET`] ?? undefined,
+    clientId: env("CLIENT_ID") ?? realEnv(`AUTH_${P}_ID`),
+    clientSecret: env("CLIENT_SECRET") ?? realEnv(`AUTH_${P}_SECRET`),
   };
 }
 
