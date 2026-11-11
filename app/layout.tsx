@@ -3,7 +3,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import Link from "next/link";
+import SiteFooter from "@/components/SiteFooter";
 import Header from "@/components/Header";
 import { MUNICIPALITY } from "@/lib/config";
 
@@ -26,14 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="flex min-h-screen flex-col font-sans">
         <Header />
         <main className="flex-1">{children}</main>
-        <footer className="border-t border-slate-200 bg-white py-6 text-center text-sm text-slate-500">
-          <p>MunFix · A community civic reporting platform for {MUNICIPALITY.name}, {MUNICIPALITY.province}</p>
-          <p className="mt-2 space-x-4">
-            <Link href="/privacy" className="hover:underline">Privacy</Link>
-            <Link href="/terms" className="hover:underline">Terms</Link>
-            <Link href="/data-deletion" className="hover:underline">Data deletion</Link>
-          </p>
-        </footer>
+        <SiteFooter municipality={MUNICIPALITY.name} province={MUNICIPALITY.province} />
         <Analytics />
         <SpeedInsights />
       </body>

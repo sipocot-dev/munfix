@@ -8,12 +8,21 @@ import { formatDate } from "@/lib/format";
 import ReportsMap from "./ReportsMap";
 import StatusBadge from "./StatusBadge";
 
+interface Stats {
+  verified: number;
+  inProgress: number;
+  resolved: number;
+  avgResolutionDays: number | null;
+}
+
 export default function Explorer({
   initialReports,
   categories,
+  stats,
 }: {
   initialReports: ReportSummary[];
   categories: Category[];
+  stats: Stats;
 }) {
   const [reports, setReports] = useState(initialReports);
   const [statuses, setStatuses] = useState<Status[]>([...PUBLIC_STATUSES]);
@@ -21,6 +30,7 @@ export default function Explorer({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [panel, setPanel] = useState<"filters" | "list" | null>(null);
   const first = useRef(true);
   const requestId = useRef(0);
 
@@ -58,99 +68,116 @@ export default function Explorer({
     });
   }
 
+  const filtered = statuses.length < PUBLIC_STATUSES.length || category !== "";
+  const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-md ring-1 ring-black/5 hover:bg-slate-50";
+
   return (
-    <section aria-label="Reports map and list">
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {PUBLIC_STATUSES.map((s) => {
-          const on = statuses.includes(s);
-          return (
-            <button
-              key={s}
-              type="button"
-              aria-pressed={on}
-              onClick={() => toggle(s)}
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                on ? "border-slate-300 bg-white text-slate-900 shadow-sm" : "border-transparent bg-slate-200/60 text-slate-500"
-              }`}
-            >
-              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: on ? STATUS_COLOR[s] : "#94a3b8" }} />
-              {STATUS_LABEL[s]}
-            </button>
-          );
-        })}
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          aria-label="Filter by category"
-          className="field !w-auto !py-1.5 text-sm"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.slug} value={c.slug}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <span className="ml-auto text-sm text-slate-500" aria-live="polite">
-          {loading ? "Updating…" : `${reports.length} report${reports.length === 1 ? "" : "s"}`}
-        </span>
-      </div>
+    <section aria-label="Reports map" className="relative h-[calc(100svh-4rem)] min-h-[480px]">
+      <ReportsMap
+        reports={reports}
+        categories={categories}
+        selectedId={selectedId}
+        onSelect={setSelectedId}
+        className="h-full w-full"
+      />
 
-      {error && (
-        <p role="alert" className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          Could not refresh the map. Showing the last results.
-        </p>
-      )}
+      <div className="absolute left-3 top-3 flex w-[calc(100%-13rem)] min-w-[220px] max-w-sm flex-col gap-2 sm:w-96">
+        <div className="flex gap-2">
+          <button type="button" className={btn} aria-expanded={panel === "filters"} onClick={() => setPanel(panel === "filters" ? null : "filters")}>
+            Filters{filtered && <span className="h-2 w-2 rounded-full bg-orange-500" aria-label="active" />}
+          </button>
+          <button type="button" className={btn} aria-expanded={panel === "list"} onClick={() => setPanel(panel === "list" ? null : "list")}>
+            List
+          </button>
+          {loading && <span className="self-center rounded-full bg-white/90 px-2 py-1 text-xs text-slate-500 shadow">Updating…</span>}
+        </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
-        <ReportsMap
-          reports={reports}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          className="h-[55vh] min-h-[360px] overflow-hidden rounded-xl border border-slate-200 lg:h-[calc(100vh-15rem)] lg:min-h-[520px]"
-        />
+        {panel === "filters" && (
+          <div className="rounded-xl bg-white p-4 shadow-lg ring-1 ring-black/5">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+            <div className="flex flex-wrap gap-2">
+              {PUBLIC_STATUSES.map((s) => {
+                const on = statuses.includes(s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggle(s)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                      on ? "border-slate-300 bg-white text-slate-900 shadow-sm" : "border-transparent bg-slate-200/60 text-slate-500"
+                    }`}
+                  >
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: on ? STATUS_COLOR[s] : "#94a3b8" }} />
+                    {STATUS_LABEL[s]}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Category
+              <select value={category} onChange={(e) => setCategory(e.target.value)} className="field mt-1 text-sm font-normal normal-case tracking-normal text-slate-900">
+                <option value="">All categories</option>
+                {categories.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
 
-        <ul className="space-y-2 lg:max-h-[calc(100vh-15rem)] lg:min-h-[520px] lg:overflow-y-auto lg:pr-1">
-          {reports.length === 0 && !loading && (
-            <li className="card p-6 text-center text-sm text-slate-500">No reports match these filters yet.</li>
-          )}
-          {reports.map((r) => (
-            <li
-              key={r.id}
-              className={`card flex gap-3 p-3 transition ${selectedId === r.id ? "ring-2 ring-teal-600" : "hover:border-slate-300"}`}
-            >
-              {r.thumb ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={r.thumb} alt="" loading="lazy" className="h-16 w-16 flex-none rounded-lg object-cover" />
-              ) : (
-                <div className="grid h-16 w-16 flex-none place-items-center rounded-lg bg-slate-100 text-slate-400" aria-hidden>
-                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11Z" />
-                    <circle cx="12" cy="10" r="2.5" />
-                  </svg>
+        {panel === "list" && (
+          <div className="flex max-h-[calc(100svh-11rem)] flex-col rounded-xl bg-white shadow-lg ring-1 ring-black/5">
+            <dl className="grid grid-cols-4 gap-2 border-b border-slate-100 p-3 text-center">
+              {[
+                ["Verified", stats.verified, "#d97706"],
+                ["In progress", stats.inProgress, "#2563eb"],
+                ["Resolved", stats.resolved, "#16a34a"],
+                ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#0f766e"],
+              ].map(([label, value, color]) => (
+                <div key={label as string}>
+                  <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
+                  <dt className="text-[11px] text-slate-500">{label}</dt>
                 </div>
-              )}
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <Link href={`/reports/${r.id}`} className="line-clamp-2 font-semibold leading-snug hover:text-teal-700">
-                    {r.title}
-                  </Link>
-                  <StatusBadge status={r.status} />
-                </div>
-                <p className="mt-0.5 truncate text-xs text-slate-500">
-                  {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(r.id)}
-                  className="mt-1 text-xs font-semibold text-teal-700 hover:underline"
-                >
-                  Show on map
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
+              ))}
+            </dl>
+            {error && <p role="alert" className="m-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Could not refresh the map. Showing the last results.</p>}
+            <ul className="space-y-2 overflow-y-auto p-3">
+              {reports.length === 0 && !loading && <li className="p-6 text-center text-sm text-slate-500">No reports match these filters yet.</li>}
+              {reports.map((r) => (
+                <li key={r.id} className={`flex gap-3 rounded-lg border p-2 ${selectedId === r.id ? "border-teal-600 ring-1 ring-teal-600" : "border-slate-200"}`}>
+                  {r.thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={r.thumb} alt="" loading="lazy" className="h-14 w-14 flex-none rounded-md object-cover" />
+                  ) : (
+                    <div className="grid h-14 w-14 flex-none place-items-center rounded-md bg-slate-100 text-slate-400" aria-hidden>
+                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5">
+                        <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11Z" />
+                        <circle cx="12" cy="10" r="2.5" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link href={`/reports/${r.id}`} className="line-clamp-2 text-sm font-semibold leading-snug hover:text-teal-700">
+                        {r.title}
+                      </Link>
+                      <StatusBadge status={r.status} />
+                    </div>
+                    <p className="mt-0.5 truncate text-xs text-slate-500">
+                      {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
+                    </p>
+                    <button type="button" onClick={() => setSelectedId(r.id)} className="text-xs font-semibold text-teal-700 hover:underline">
+                      Show on map
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
     </section>
   );
