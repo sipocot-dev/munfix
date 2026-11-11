@@ -76,8 +76,12 @@ export default async function ReportPage({ params }: Props) {
                 {report.media.map((m) => (
                   <li key={m.id}>
                     <a href={m.url} target="_blank" rel="noopener noreferrer">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={m.url} alt="Photo of the reported issue" className="aspect-square w-full rounded-lg object-cover" />
+                      {m.url.endsWith(".pdf") ? (
+                        <span className="grid aspect-square w-full place-items-center rounded-lg bg-slate-100 text-sm font-semibold text-ink-700">Open PDF</span>
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={m.url} alt="Photo of the reported issue" className="aspect-square w-full rounded-lg object-cover" />
+                      )}
                     </a>
                   </li>
                 ))}

@@ -5,12 +5,13 @@ import { HttpError } from "./errors";
 
 export const MAX_FILES = 3;
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
-export const FILE_NAME_RE = /^[0-9a-f-]{36}\.(jpg|png|webp)$/;
+export const FILE_NAME_RE = /^[0-9a-f-]{36}\.(jpg|png|webp|pdf)$/;
 
 export const CONTENT_TYPES: Record<string, string> = {
   jpg: "image/jpeg",
   png: "image/png",
   webp: "image/webp",
+  pdf: "application/pdf",
 };
 
 /* ----------------------------- Storage drivers ----------------------------- */
@@ -115,7 +116,8 @@ function getStore(): Store {
 /* ----------------------------- Public API ----------------------------- */
 
 /** Identify the image type from its magic bytes (never trust the client's MIME type). */
-function sniff(buf: Buffer): "jpg" | "png" | "webp" | null {
+function sniff(buf: Buffer): "jpg" | "png" | "webp" | "pdf" | null {
+  if (buf.length > 4 && buf.subarray(0, 5).toString("ascii") === "%PDF-") return "pdf";
   if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return "jpg";
   if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
     return "png";
@@ -135,7 +137,7 @@ export async function saveImages(files: File[]): Promise<string[]> {
     if (file.size > MAX_FILE_BYTES) throw new HttpError(400, "Each photo must be 5 MB or smaller");
     const buf = Buffer.from(await file.arrayBuffer());
     const ext = sniff(buf);
-    if (!ext) throw new HttpError(400, "Photos must be JPEG, PNG or WebP images");
+    if (!ext) throw new HttpError(400, "Attachments must be JPEG, PNG or WebP images, or PDF files");
     prepared.push({ name: `${randomUUID()}.${ext}`, buf, type: CONTENT_TYPES[ext] });
   }
   if (prepared.length === 0) return [];

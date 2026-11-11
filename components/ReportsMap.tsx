@@ -29,16 +29,15 @@ function pinElement(r: ReportSummary): HTMLButtonElement {
     <path d="M17 43C17 43 2 28 2 16a15 15 0 0 1 30 0c0 12-15 27-15 27Z" fill="${color}" stroke="#fff" stroke-width="2"/>
     <circle cx="17" cy="16" r="10" fill="#fff"/>
     <text x="17" y="21" text-anchor="middle" font-size="13">${glyphFor(r.categorySlug)}</text></svg>`;
-  // Hover/focus label above the pin; it does not move the pin.
-  const tip = document.createElement("span");
-  tip.textContent = r.title;
-  tip.style.cssText = "display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#0f172a;color:#fff;font-size:12px;font-weight:600;padding:5px 8px;border-radius:6px;pointer-events:none";
-  const show = (on: boolean) => () => (tip.style.display = on ? "block" : "none");
+  // Hover/focus card with the photo and details; it does not move the pin.
+  const card = popupNode(r);
+  card.style.cssText = "display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:8px;width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
+  const show = (on: boolean) => () => (card.style.display = on ? "block" : "none");
   el.addEventListener("mouseenter", show(true));
   el.addEventListener("focus", show(true));
   el.addEventListener("mouseleave", show(false));
   el.addEventListener("blur", show(false));
-  el.append(tip);
+  el.append(card);
   return el;
 }
 

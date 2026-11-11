@@ -107,7 +107,7 @@ const SUMMARY_COLUMNS = `
   r.created_at, r.resolved_at,
   c.slug AS category_slug, c.name AS category_name,
   (SELECT pt.name FROM problem_types pt WHERE pt.id = r.problem_type_id) AS problem_type,
-  (SELECT m.path FROM report_media m WHERE m.report_id = r.id ORDER BY m.created_at LIMIT 1) AS thumb
+  (SELECT m.path FROM report_media m WHERE m.report_id = r.id AND m.path NOT LIKE '%.pdf' ORDER BY m.created_at LIMIT 1) AS thumb
 `;
 
 function toSummary(row: SummaryRow): ReportSummary {
@@ -287,8 +287,9 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
     note: string | null;
     created_at: Date;
     actor_name: string | null;
+    actor_role: string | null;
   }>(
-    `SELECT e.id, e.from_status, e.to_status, e.note, e.created_at, u.name AS actor_name
+    `SELECT e.id, e.from_status, e.to_status, e.note, e.created_at, u.name AS actor_name, u.role AS actor_role
        FROM report_events e LEFT JOIN users u ON u.id = e.actor_id
       WHERE e.report_id = $1
       ORDER BY e.created_at, e.id`,
@@ -311,7 +312,8 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
       toStatus: e.to_status,
       note: e.note,
       createdAt: e.created_at.toISOString(),
-      actorName: staffViewer ? e.actor_name : null,
+      // Staff, moderators and admins get public credit for their changes; citizens stay anonymous.
+      actorName: e.actor_role && e.actor_role !== "citizen" ? e.actor_name : null,
     })),
     isOwner,
     canWithdraw: isOwner && CITIZEN_WITHDRAWABLE.includes(row.status),

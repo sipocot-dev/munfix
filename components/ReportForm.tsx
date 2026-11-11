@@ -162,8 +162,12 @@ export default function ReportForm({
           <ul className="flex flex-wrap gap-3">
             {previews.map((src, i) => (
               <li key={src} className="relative">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt={`Selected photo ${i + 1}`} className="h-24 w-24 rounded-lg object-cover" />
+                {files[i].type === "application/pdf" ? (
+                  <span className="grid h-24 w-24 place-items-center break-all rounded-lg bg-slate-100 p-2 text-center text-xs font-semibold">{files[i].name}</span>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={src} alt={`Selected photo ${i + 1}`} className="h-24 w-24 rounded-lg object-cover" />
+                )}
                 <button
                   type="button"
                   onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
@@ -179,7 +183,7 @@ export default function ReportForm({
         {files.length < MAX_FILES && (
           <input
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,application/pdf"
             multiple
             onChange={onFiles}
             className="block text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:font-semibold hover:file:bg-slate-200"
