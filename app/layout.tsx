@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import Link from "next/link";
 import Header from "@/components/Header";
 import { MUNICIPALITY } from "@/lib/config";
@@ -32,6 +34,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/data-deletion" className="hover:underline">Data deletion</Link>
           </p>
         </footer>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
