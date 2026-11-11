@@ -8,6 +8,9 @@ import { formatDate } from "@/lib/format";
 import ReportsMap from "./ReportsMap";
 import StatusBadge from "./StatusBadge";
 
+/** The map opens on reports that still need work; citizens can switch on Resolved. */
+const DEFAULT_STATUSES: Status[] = ["verified", "in_progress"];
+
 interface Stats {
   verified: number;
   inProgress: number;
@@ -24,8 +27,8 @@ export default function Explorer({
   categories: Category[];
   stats: Stats;
 }) {
-  const [reports, setReports] = useState(initialReports);
-  const [statuses, setStatuses] = useState<Status[]>([...PUBLIC_STATUSES]);
+  const [reports, setReports] = useState(initialReports.filter((r) => DEFAULT_STATUSES.includes(r.status)));
+  const [statuses, setStatuses] = useState<Status[]>([...DEFAULT_STATUSES]);
   const [category, setCategory] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -85,7 +88,7 @@ export default function Explorer({
     setSearchOpen(false);
   }
 
-  const filtered = statuses.length < PUBLIC_STATUSES.length || category !== "";
+  const filtered = statuses.join() !== DEFAULT_STATUSES.join() || category !== "";
   const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 panel hover:bg-slate-50";
 
   return (

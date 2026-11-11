@@ -23,11 +23,22 @@ function pinElement(r: ReportSummary): HTMLButtonElement {
   const el = document.createElement("button");
   el.type = "button";
   el.setAttribute("aria-label", `${r.title}, ${STATUS_LABEL[r.status]}`);
-  el.style.cssText = "all:unset;cursor:pointer;display:block;width:34px;height:44px;transform-origin:50% 100%;transition:transform .15s";
-  el.innerHTML = `<svg viewBox="0 0 34 44" width="34" height="44" style="display:block;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))" aria-hidden="true">
+  // No transition here: MapLibre positions this element with transform, so animating it makes pins wobble.
+  el.style.cssText = "all:unset;cursor:pointer;display:block;width:34px;height:44px";
+  el.innerHTML = `<svg viewBox="0 0 34 44" width="34" height="44" style="display:block;transform-origin:50% 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))" aria-hidden="true">
     <path d="M17 43C17 43 2 28 2 16a15 15 0 0 1 30 0c0 12-15 27-15 27Z" fill="${color}" stroke="#fff" stroke-width="2"/>
     <circle cx="17" cy="16" r="10" fill="#fff"/>
     <text x="17" y="21" text-anchor="middle" font-size="13">${glyphFor(r.categorySlug)}</text></svg>`;
+  // Hover/focus label above the pin; it does not move the pin.
+  const tip = document.createElement("span");
+  tip.textContent = r.title;
+  tip.style.cssText = "display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:6px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#0f172a;color:#fff;font-size:12px;font-weight:600;padding:5px 8px;border-radius:6px;pointer-events:none";
+  const show = (on: boolean) => () => (tip.style.display = on ? "block" : "none");
+  el.addEventListener("mouseenter", show(true));
+  el.addEventListener("focus", show(true));
+  el.addEventListener("mouseleave", show(false));
+  el.addEventListener("blur", show(false));
+  el.append(tip);
   return el;
 }
 
@@ -204,7 +215,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
     if (!ready || !map) return;
 
     markersRef.current.forEach((m, id) => {
-      m.el.style.transform = id === selectedId ? "scale(1.25)" : "";
+      (m.el.firstElementChild as HTMLElement).style.transform = id === selectedId ? "scale(1.25)" : "";
       m.el.style.zIndex = id === selectedId ? "5" : "";
     });
 
