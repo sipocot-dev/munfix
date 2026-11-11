@@ -7,7 +7,7 @@ import { apiError } from "@/lib/client";
 function Msg({ ok, text }: { ok: boolean; text: string | null }) {
   if (!text) return null;
   return (
-    <p role={ok ? "status" : "alert"} className={`rounded-lg px-3 py-2 text-sm ${ok ? "bg-teal-50 text-teal-900" : "bg-red-50 text-red-700"}`}>
+    <p role={ok ? "status" : "alert"} className={`rounded-lg px-3 py-2 text-sm ${ok ? "bg-ink-50 text-ink-900" : "bg-red-50 text-red-700"}`}>
       {text}
     </p>
   );

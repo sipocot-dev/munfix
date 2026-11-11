@@ -28,7 +28,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         </p>
       )}
       {!forced && (await searchParams).reason === "password" && (
-        <p className="rounded-lg bg-teal-50 px-4 py-3 text-sm text-teal-900">Your password is up to date.</p>
+        <p className="rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-900">Your password is up to date.</p>
       )}
 
       <section className="card space-y-3 p-5">
@@ -47,7 +47,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               {account.email} · member since {formatDate(account.createdAt)}
             </p>
             <p className="text-sm">
-              <span className="rounded-full bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">{ROLE_LABEL[account.role]}</span>{" "}
+              <span className="rounded-full bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-800">{ROLE_LABEL[account.role]}</span>{" "}
               <span className="text-slate-600">{ROLE_DESCRIPTION[account.role]}</span>
             </p>
             <ProfileForm name={account.name} />

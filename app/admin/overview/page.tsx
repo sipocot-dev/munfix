@@ -18,7 +18,7 @@ function Bars({ rows }: { rows: { label: string; count: number; color?: string }
             <span className="font-semibold tabular-nums">{r.count}</span>
           </div>
           <div className="mt-1 h-2 rounded-full bg-slate-100">
-            <div className="h-2 rounded-full" style={{ width: `${(r.count / max) * 100}%`, background: r.color ?? "#0f766e" }} />
+            <div className="h-2 rounded-full" style={{ width: `${(r.count / max) * 100}%`, background: r.color ?? "#1d3557" }} />
           </div>
         </li>
       ))}
@@ -47,7 +47,7 @@ export default async function OverviewPage() {
         <h2 className="text-lg font-semibold">Reports per day (last 30 days)</h2>
         <div className="mt-4 flex h-32 items-end gap-1" role="img" aria-label="Bar chart of reports submitted per day over the last 30 days">
           {o.daily.map((d) => (
-            <div key={d.day} title={`${d.day}: ${d.count}`} className="flex-1 rounded-t bg-teal-600" style={{ height: `${Math.max(d.count ? 6 : 2, (d.count / maxDay) * 100)}%`, opacity: d.count ? 1 : 0.2 }} />
+            <div key={d.day} title={`${d.day}: ${d.count}`} className="flex-1 rounded-t bg-ink-600" style={{ height: `${Math.max(d.count ? 6 : 2, (d.count / maxDay) * 100)}%`, opacity: d.count ? 1 : 0.2 }} />
           ))}
         </div>
       </section>

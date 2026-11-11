@@ -201,7 +201,7 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
                   ) : (
                     <p className="text-slate-600">
                       Scope: {u.categoryIds.length === 0 ? "all categories" : categories.filter((c) => u.categoryIds.includes(c.id)).map((c) => c.name).join(", ")}{" "}
-                      <button type="button" className="font-semibold text-teal-700 hover:underline" onClick={() => { setEditing(u.id); setEditCats(u.categoryIds); }}>Edit</button>
+                      <button type="button" className="font-semibold text-ink-700 hover:underline" onClick={() => { setEditing(u.id); setEditCats(u.categoryIds); }}>Edit</button>
                     </p>
                   )}
                 </div>

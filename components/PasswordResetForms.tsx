@@ -40,7 +40,7 @@ export function ForgotForm({ emailEnabled }: { emailEnabled: boolean }) {
 
   if (sent) {
     return (
-      <p role="status" className="mt-6 rounded-lg bg-teal-50 px-3 py-3 text-sm text-teal-900">
+      <p role="status" className="mt-6 rounded-lg bg-ink-50 px-3 py-3 text-sm text-ink-900">
         If an account exists for that email, we have sent a link to reset the password. It is valid for one hour. Check your spam folder if it does not arrive.
       </p>
     );
@@ -95,7 +95,7 @@ export function ResetForm({ token }: { token: string }) {
 
   if (done) {
     return (
-      <p role="status" className="mt-6 rounded-lg bg-teal-50 px-3 py-3 text-sm text-teal-900">
+      <p role="status" className="mt-6 rounded-lg bg-ink-50 px-3 py-3 text-sm text-ink-900">
         Your password was changed. Redirecting you to log in…{" "}
         <Link href="/login" className="font-semibold underline">
           Log in now

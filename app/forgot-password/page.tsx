@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
         <p className="mt-1 text-sm text-slate-600">Enter your email and we will send you a link to choose a new one.</p>
         <ForgotForm emailEnabled={mailEnabled()} />
         <p className="mt-5 text-center text-sm">
-          <Link href="/login" className="font-semibold text-teal-700 hover:underline">
+          <Link href="/login" className="font-semibold text-ink-700 hover:underline">
             Back to log in
           </Link>
         </p>

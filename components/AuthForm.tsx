@@ -126,7 +126,7 @@ export default function AuthForm({
             />
             {!isLogin && <span className="mt-1 block text-xs font-normal text-slate-500">At least 8 characters.</span>}
             {isLogin && (
-              <Link href="/forgot-password" className="mt-1 inline-block text-xs font-semibold text-teal-700 hover:underline">
+              <Link href="/forgot-password" className="mt-1 inline-block text-xs font-semibold text-ink-700 hover:underline">
                 Forgot your password?
               </Link>
             )}
@@ -145,7 +145,7 @@ export default function AuthForm({
 
         <p className="mt-5 text-center text-sm text-slate-600">
           {isLogin ? "New here? " : "Already have an account? "}
-          <Link href={`${isLogin ? "/register" : "/login"}${nextQuery}`} className="font-semibold text-teal-700 hover:underline">
+          <Link href={`${isLogin ? "/register" : "/login"}${nextQuery}`} className="font-semibold text-ink-700 hover:underline">
             {isLogin ? "Create an account" : "Log in"}
           </Link>
         </p>

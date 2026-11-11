@@ -69,7 +69,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
               <tr key={e.id} className="align-top">
                 <td className="whitespace-nowrap px-4 py-3 text-slate-600">{formatDateTime(e.createdAt)}</td>
                 <td className="px-4 py-3">
-                  <Link href={`/reports/${e.reportId}`} className="font-medium hover:text-teal-700">
+                  <Link href={`/reports/${e.reportId}`} className="font-medium hover:text-ink-700">
                     {e.reportTitle}
                   </Link>
                 </td>
@@ -85,7 +85,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
         </table>
       </div>
 
-      <div className="mt-4 flex justify-between text-sm font-semibold text-teal-700">
+      <div className="mt-4 flex justify-between text-sm font-semibold text-ink-700">
         {page > 1 ? <Link href={`/admin/audit?page=${page - 1}`}>← Newer</Link> : <span />}
         {hasNext && <Link href={`/admin/audit?page=${page + 1}`}>Older →</Link>}
       </div>

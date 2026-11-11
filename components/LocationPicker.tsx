@@ -64,7 +64,7 @@ export default function LocationPicker({ value, onChange }: { value: LngLat | nu
       }
       const { Marker } = await import("maplibre-gl");
       if (cancelled || markerRef.current || !mapRef.current) return;
-      const marker = new Marker({ color: "#0f766e", draggable: true })
+      const marker = new Marker({ color: "#1d3557", draggable: true })
         .setLngLat([value.lng, value.lat])
         .addTo(mapRef.current);
       marker.on("dragend", () => {

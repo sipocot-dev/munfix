@@ -22,13 +22,13 @@ export default function ProgressSteps({ status }: { status: Status }) {
           <li key={step.status} className="relative flex flex-1 flex-col items-center text-center" aria-current={active ? "step" : undefined}>
             {i > 0 && (
               <span
-                className={`absolute right-1/2 top-3 h-0.5 w-full ${i <= current ? "bg-teal-600" : "bg-slate-200"}`}
+                className={`absolute right-1/2 top-3 h-0.5 w-full ${i <= current ? "bg-ink-600" : "bg-slate-200"}`}
                 aria-hidden
               />
             )}
             <span
               className={`relative z-10 grid h-6 w-6 place-items-center rounded-full text-xs font-bold ${
-                done ? "bg-teal-600 text-white" : active ? "bg-white text-teal-700 ring-2 ring-teal-600" : "bg-slate-200 text-slate-400"
+                done ? "bg-ink-600 text-white" : active ? "bg-white text-ink-700 ring-2 ring-ink-600" : "bg-slate-200 text-slate-400"
               }`}
             >
               {done ? "✓" : i + 1}

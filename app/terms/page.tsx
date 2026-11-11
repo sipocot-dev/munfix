@@ -9,7 +9,7 @@ export default function Page() {
   return (
     <article className="legal mx-auto max-w-2xl px-4 py-10">
       <h1 className="text-3xl font-bold tracking-tight">Terms of use</h1>
-      <div className="mt-6 space-y-4 text-slate-700 [&_a]:font-semibold [&_a]:text-teal-700 [&_a]:underline [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-slate-900 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6">
+      <div className="mt-6 space-y-4 text-slate-700 [&_a]:font-semibold [&_a]:text-ink-700 [&_a]:underline [&_h2]:mt-6 [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-slate-900 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-6">
         {/* eslint-disable react/no-unescaped-entities */}
         
 <p>By using MunFix for {M}, {P} you agree to these terms.</p>

@@ -33,7 +33,7 @@ export default async function MyReportsPage() {
       {reports.length === 0 ? (
         <div className="card p-10 text-center">
           <p className="text-slate-600">You have not reported anything yet.</p>
-          <Link href="/report/new" className="mt-4 inline-block font-semibold text-teal-700 hover:underline">
+          <Link href="/report/new" className="mt-4 inline-block font-semibold text-ink-700 hover:underline">
             Report your first issue →
           </Link>
         </div>
@@ -42,7 +42,7 @@ export default async function MyReportsPage() {
           {reports.map((r) => (
             <li key={r.id} className="card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <Link href={`/reports/${r.id}`} className="font-semibold hover:text-teal-700">
+                <Link href={`/reports/${r.id}`} className="font-semibold hover:text-ink-700">
                   {r.title}
                 </Link>
                 <StatusBadge status={r.status} />

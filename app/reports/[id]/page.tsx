@@ -31,7 +31,7 @@ export default async function ReportPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/" className="text-sm font-semibold text-teal-700 hover:underline">
+      <Link href="/" className="text-sm font-semibold text-ink-700 hover:underline">
         ← Back to map
       </Link>
 
@@ -53,7 +53,7 @@ export default async function ReportPage({ params }: Props) {
         <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">
           This report duplicates another one.{" "}
           {report.duplicateOf && (
-            <Link href={`/reports/${report.duplicateOf}`} className="font-semibold text-teal-700 hover:underline">
+            <Link href={`/reports/${report.duplicateOf}`} className="font-semibold text-ink-700 hover:underline">
               View the original
             </Link>
           )}
@@ -93,7 +93,7 @@ export default async function ReportPage({ params }: Props) {
               <ol className="mt-4 space-y-5 border-l-2 border-slate-200 pl-5">
                 {report.events.map((e) => (
                   <li key={e.id} className="relative">
-                    <span className="absolute -left-[1.62rem] top-1.5 h-2.5 w-2.5 rounded-full bg-teal-600 ring-4 ring-white" aria-hidden />
+                    <span className="absolute -left-[1.62rem] top-1.5 h-2.5 w-2.5 rounded-full bg-ink-600 ring-4 ring-white" aria-hidden />
                     <p className="font-semibold">{STATUS_LABEL[e.toStatus]}</p>
                     <p className="text-xs text-slate-500">
                       {formatDateTime(e.createdAt)}

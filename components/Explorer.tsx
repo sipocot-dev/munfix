@@ -86,7 +86,7 @@ export default function Explorer({
   }
 
   const filtered = statuses.length < PUBLIC_STATUSES.length || category !== "";
-  const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-md ring-1 ring-black/5 hover:bg-slate-50";
+  const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 panel hover:bg-slate-50";
 
   return (
     <section aria-label="Reports map" className="relative h-[calc(100svh-4rem)] min-h-[480px]">
@@ -98,7 +98,7 @@ export default function Explorer({
         className="h-full w-full"
       />
 
-      <div className="absolute left-3 top-3 flex w-[calc(100%-13rem)] min-w-[220px] max-w-sm flex-col gap-2 sm:w-96">
+      <div className="absolute left-3 top-3 flex w-[calc(100%-1.5rem)] max-w-sm flex-col gap-2 sm:w-96">
         <div className="relative">
           <input
             type="search"
@@ -111,7 +111,7 @@ export default function Explorer({
             onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
             placeholder="Search problems, places, barangays…"
             aria-label="Search reports"
-            className="w-full rounded-xl bg-white px-4 py-2.5 text-sm shadow-md ring-1 ring-black/5 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+            className="w-full rounded-xl bg-white px-4 py-2.5 text-sm panel placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ink-600"
           />
           {searchOpen && needle && (
             <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5">
@@ -180,7 +180,7 @@ export default function Explorer({
                 ["Verified", stats.verified, "#d97706"],
                 ["In progress", stats.inProgress, "#2563eb"],
                 ["Resolved", stats.resolved, "#16a34a"],
-                ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#0f766e"],
+                ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#1d3557"],
               ].map(([label, value, color]) => (
                 <div key={label as string}>
                   <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
@@ -192,7 +192,7 @@ export default function Explorer({
             <ul className="space-y-2 overflow-y-auto p-3">
               {reports.length === 0 && !loading && <li className="p-6 text-center text-sm text-slate-500">No reports match these filters yet.</li>}
               {reports.map((r) => (
-                <li key={r.id} className={`flex gap-3 rounded-lg border p-2 ${selectedId === r.id ? "border-teal-600 ring-1 ring-teal-600" : "border-slate-200"}`}>
+                <li key={r.id} className={`flex gap-3 rounded-lg border p-2 ${selectedId === r.id ? "border-ink-600 ring-1 ring-ink-600" : "border-slate-200"}`}>
                   {r.thumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={r.thumb} alt="" loading="lazy" className="h-14 w-14 flex-none rounded-md object-cover" />
@@ -206,7 +206,7 @@ export default function Explorer({
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <Link href={`/reports/${r.id}`} className="line-clamp-2 text-sm font-semibold leading-snug hover:text-teal-700">
+                      <Link href={`/reports/${r.id}`} className="line-clamp-2 text-sm font-semibold leading-snug hover:text-ink-700">
                         {r.title}
                       </Link>
                       <StatusBadge status={r.status} />
@@ -214,7 +214,7 @@ export default function Explorer({
                     <p className="mt-0.5 truncate text-xs text-slate-500">
                       {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
                     </p>
-                    <button type="button" onClick={() => setSelectedId(r.id)} className="text-xs font-semibold text-teal-700 hover:underline">
+                    <button type="button" onClick={() => setSelectedId(r.id)} className="text-xs font-semibold text-ink-700 hover:underline">
                       Show on map
                     </button>
                   </div>

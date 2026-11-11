@@ -107,7 +107,7 @@ export function statusEmail(i: Input): { subject: string; text: string; html: st
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">
       <tr><td style="padding:24px 24px 8px">
-        <div style="font-size:13px;font-weight:700;color:#0f766e">MunFix ${escapeHtml(MUNICIPALITY.name)}</div>
+        <div style="font-size:13px;font-weight:700;color:#1d3557">MunFix ${escapeHtml(MUNICIPALITY.name)}</div>
         <h1 style="margin:12px 0 4px;font-size:20px;line-height:1.3">${escapeHtml(c.headline)}</h1>
         <span style="display:inline-block;margin:4px 0 12px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;color:${color};background:${color}1a">${escapeHtml(STATUS_LABEL[i.to])}</span>
       </td></tr>
@@ -120,8 +120,8 @@ export function statusEmail(i: Input): { subject: string; text: string; html: st
             ? `<div style="margin:0 0 16px;padding:12px;background:#f1f5f9;border-radius:8px;font-size:14px;line-height:1.5"><strong>${noteLabel}:</strong> ${escapeHtml(i.note)}</div>`
             : ""
         }
-        <a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 18px;background:#0f766e;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">View your report</a>
-        ${originalUrl ? `<p style="margin:12px 0 0;font-size:14px"><a href="${escapeHtml(originalUrl)}" style="color:#0f766e">View the original report</a></p>` : ""}
+        <a href="${escapeHtml(url)}" style="display:inline-block;padding:10px 18px;background:#1d3557;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">View your report</a>
+        ${originalUrl ? `<p style="margin:12px 0 0;font-size:14px"><a href="${escapeHtml(originalUrl)}" style="color:#1d3557">View the original report</a></p>` : ""}
       </td></tr>
       <tr><td style="padding:24px;font-size:12px;color:#64748b">
         You are receiving this because you submitted a report on MunFix ${escapeHtml(MUNICIPALITY.name)}.
@@ -152,11 +152,11 @@ export function resetEmail(i: { name: string; url: string; minutes: number }): {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:24px 12px"><tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px">
       <tr><td style="padding:24px">
-        <div style="font-size:13px;font-weight:700;color:#0f766e">MunFix ${escapeHtml(MUNICIPALITY.name)}</div>
+        <div style="font-size:13px;font-weight:700;color:#1d3557">MunFix ${escapeHtml(MUNICIPALITY.name)}</div>
         <h1 style="margin:12px 0;font-size:20px">Reset your password</h1>
         <p style="margin:0 0 12px;font-size:15px">Hi ${escapeHtml(i.name)},</p>
         <p style="margin:0 0 16px;font-size:15px;line-height:1.5;color:#334155">We received a request to reset your password. This link is valid for ${i.minutes} minutes.</p>
-        <a href="${escapeHtml(i.url)}" style="display:inline-block;padding:10px 18px;background:#0f766e;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">Choose a new password</a>
+        <a href="${escapeHtml(i.url)}" style="display:inline-block;padding:10px 18px;background:#1d3557;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;font-size:14px">Choose a new password</a>
         <p style="margin:16px 0 0;font-size:12px;color:#64748b">If you did not ask for this, ignore this email. Your password will not change.</p>
       </td></tr>
     </table>

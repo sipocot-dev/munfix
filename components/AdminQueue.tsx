@@ -68,7 +68,7 @@ export default function AdminQueue({ initial, tabs }: { initial: AdminReportRow[
           {rows.map((r) => (
             <li key={r.id} className="card p-4">
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <Link href={`/reports/${r.id}`} className="text-base font-semibold hover:text-teal-700">
+                <Link href={`/reports/${r.id}`} className="text-base font-semibold hover:text-ink-700">
                   {r.title}
                 </Link>
                 <StatusBadge status={r.status} />

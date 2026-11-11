@@ -1,7 +1,21 @@
+@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
+/* Civic palette: ink navy for the brand, signal orange for "report", map paper behind everything. */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --color-ink-50: #eef2f7;
+  --color-ink-600: #2c4a6e;
+  --color-ink-700: #1d3557;
+  --color-ink-800: #142740;
+  --color-ink-900: #0c1a2e;
+}
+
+/* One floating-control surface for search, filters, legend and map buttons. */
+.panel {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.08);
 }
 
 html {

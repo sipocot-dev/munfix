@@ -19,7 +19,7 @@ export default function AdminNav({ role, current }: { role: Role; current: strin
           href={i.href}
           aria-current={i.href === current ? "page" : undefined}
           className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold ${
-            i.href === current ? "border-teal-600 text-teal-800" : "border-transparent text-slate-600 hover:text-slate-900"
+            i.href === current ? "border-ink-600 text-ink-800" : "border-transparent text-slate-600 hover:text-slate-900"
           }`}
         >
           {i.label}

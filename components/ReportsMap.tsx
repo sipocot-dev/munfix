@@ -58,14 +58,14 @@ function popupNode(r: ReportSummary): HTMLElement {
   const link = document.createElement("a");
   link.href = `/reports/${r.id}`;
   link.textContent = "View details →";
-  link.style.cssText = "font-size:13px;font-weight:600;color:#0f766e";
+  link.style.cssText = "font-size:13px;font-weight:600;color:#1d3557";
 
   root.append(status, title, meta, link);
   return root;
 }
 
 const ctrl =
-  "grid h-11 w-11 place-items-center rounded-xl bg-white text-slate-700 shadow-md ring-1 ring-black/5 hover:bg-slate-50 active:scale-95 text-sm font-bold";
+  "grid h-11 w-11 place-items-center rounded-xl bg-white text-slate-700 panel hover:bg-slate-50 active:scale-95 text-sm font-bold";
 
 export default function ReportsMap({ reports, categories, selectedId, onSelect, className }: Props) {
   const el = useRef<HTMLDivElement>(null);
@@ -300,7 +300,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
         </p>
       )}
 
-      <div className="pointer-events-none absolute right-3 top-3 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-md ring-1 ring-black/5" aria-live="polite">
+      <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 panel" aria-live="polite">
         {visible} report{visible === 1 ? "" : "s"} visible
       </div>
 
@@ -337,7 +337,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
           type="button"
           onClick={() => setLegend((v) => !v)}
           aria-expanded={legend}
-          className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 shadow-md ring-1 ring-black/5 hover:bg-slate-50"
+          className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 panel hover:bg-slate-50"
         >
           <span className="grid h-5 w-5 place-items-center rounded-full border-2 border-slate-700 text-[11px] leading-none">?</span>
           Legend
@@ -345,15 +345,15 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
       </div>
 
       <div className="absolute bottom-6 right-3 flex flex-col gap-2">
-        <button type="button" onClick={toggle3d} aria-pressed={pitched} aria-label="Toggle 3D view" className={`${ctrl} ${pitched ? "!bg-teal-700 !text-white" : ""}`}>
+        <button type="button" onClick={toggle3d} aria-pressed={pitched} aria-label="Toggle 3D view" className={`${ctrl} ${pitched ? "!bg-ink-700 !text-white" : ""}`}>
           3D
         </button>
-        <button type="button" onClick={toggleTerrain} aria-pressed={terrain} aria-label="Toggle terrain" className={`${ctrl} ${terrain ? "!bg-teal-700 !text-white" : ""}`}>
+        <button type="button" onClick={toggleTerrain} aria-pressed={terrain} aria-label="Toggle terrain" className={`${ctrl} ${terrain ? "!bg-ink-700 !text-white" : ""}`}>
           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
             <path d="M3 19 9 8l4 7 3-4 5 8H3Z" />
           </svg>
         </button>
-        <div className="overflow-hidden rounded-xl bg-white shadow-md ring-1 ring-black/5">
+        <div className="overflow-hidden rounded-xl bg-white panel">
           <button type="button" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom in" className="grid h-11 w-11 place-items-center text-xl hover:bg-slate-50">
             +
           </button>

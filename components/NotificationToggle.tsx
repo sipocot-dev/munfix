@@ -46,7 +46,7 @@ export default function NotificationToggle({ initial }: { initial: boolean }) {
           className="peer sr-only"
           aria-label="Email updates"
         />
-        <span className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-teal-600 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-teal-600 peer-disabled:opacity-60" />
+        <span className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-ink-600 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink-600 peer-disabled:opacity-60" />
         <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
       </label>
     </div>

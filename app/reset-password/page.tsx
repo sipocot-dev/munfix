@@ -15,7 +15,7 @@ export default async function ResetPasswordPage({ searchParams }: { searchParams
         ) : (
           <p className="mt-4 text-sm text-slate-600">
             This link is incomplete.{" "}
-            <Link href="/forgot-password" className="font-semibold text-teal-700 hover:underline">
+            <Link href="/forgot-password" className="font-semibold text-ink-700 hover:underline">
               Request a new reset link
             </Link>
             .
