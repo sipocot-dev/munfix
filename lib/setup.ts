@@ -169,6 +169,9 @@ export async function ensureMigrated(pool: Pool, log: Log = console.log): Promis
 export async function ensureDatabaseReady(pool: Pool, log: Log = console.log): Promise<void> {
   const client = await pool.connect();
   try {
+    // Setup waits on the lock and runs migrations; the pool's 15 s statement timeout would cancel
+    // it halfway ("canceling statement due to statement timeout"). Setup gets no timeout.
+    await client.query("SET statement_timeout = 0");
     await client.query("SELECT pg_advisory_lock($1)", [SETUP_LOCK]);
     // Create MunFix's schema first; see DB_SCHEMA in lib/db.ts.
     await client.query(`CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA}`);
