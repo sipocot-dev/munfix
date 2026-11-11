@@ -6,6 +6,7 @@ import StaticMap from "@/components/StaticMap";
 import StatusBadge from "@/components/StatusBadge";
 import TransitionControls from "@/components/TransitionControls";
 import WithdrawButton from "@/components/WithdrawButton";
+import CommunityActions from "@/components/CommunityActions";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { getReportDetail } from "@/lib/reports";
 import { canViewUnpublished, isStaffRole } from "@/lib/permissions";
@@ -133,6 +134,13 @@ export default async function ReportPage({ params }: Props) {
               <WithdrawButton id={report.id} />
             </section>
           )}
+          <CommunityActions
+            id={report.id}
+            signedIn={Boolean(session)}
+            canReopen={report.status === "resolved" && (report.isOwner || isStaffRole(session?.role))}
+            feedback={report.feedback}
+            followups={report.followups}
+          />
         </aside>
       </div>
     </div>

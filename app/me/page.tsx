@@ -6,7 +6,7 @@ import StatusBadge from "@/components/StatusBadge";
 import { query } from "@/lib/db";
 import { mailEnabled } from "@/lib/mail";
 import { formatDate } from "@/lib/format";
-import { listUserReports } from "@/lib/reports";
+import { getPoints, listUserReports } from "@/lib/reports";
 import { requirePageRole } from "@/lib/guards";
 import { isPublicStatus } from "@/lib/status";
 
@@ -15,6 +15,7 @@ export const metadata: Metadata = { title: "My reports" };
 export default async function MyReportsPage() {
   const session = await requirePageRole("/me");
   const reports = await listUserReports(session.userId);
+  const points = await getPoints(session.userId);
   const [prefs] = mailEnabled()
     ? await query<{ email_notifications: boolean }>("SELECT email_notifications FROM users WHERE id = $1", [session.userId])
     : [];
@@ -22,7 +23,10 @@ export default async function MyReportsPage() {
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <div className="mb-6 flex items-center justify-between gap-4">
-        <h1 className="text-3xl font-bold tracking-tight">My reports</h1>
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">My reports</h1>
+          <p className="mt-1 text-sm text-slate-600">{points} points from resolved reports</p>
+        </div>
         <Link href="/report/new" className="btn btn-primary">
           New report
         </Link>

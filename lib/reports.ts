@@ -51,9 +51,18 @@ export interface ReportEvent {
   toStatus: Status;
   note: string | null;
   createdAt: string;
-  /** Only populated for admins. */
+  /** Staff names are public; citizen names are not. */
   actorName: string | null;
 }
+
+export interface ReportNote {
+  id: string;
+  text: string;
+  createdAt: string;
+  actorName: string | null;
+}
+
+export const RESOLVE_POINTS = 10;
 
 export interface ReportDetail extends ReportSummary {
   description: string;
@@ -62,6 +71,8 @@ export interface ReportDetail extends ReportSummary {
   updatedAt: string;
   media: { id: string; url: string }[];
   events: ReportEvent[];
+  feedback: ReportNote[];
+  followups: ReportNote[];
   isOwner: boolean;
   canWithdraw: boolean;
   /** Only populated for moderators and admins. */
@@ -286,10 +297,11 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
     to_status: Status;
     note: string | null;
     created_at: Date;
+    kind: string;
     actor_name: string | null;
     actor_role: string | null;
   }>(
-    `SELECT e.id, e.from_status, e.to_status, e.note, e.created_at, u.name AS actor_name, u.role AS actor_role
+    `SELECT e.id, e.from_status, e.to_status, e.note, e.created_at, e.kind, u.name AS actor_name, u.role AS actor_role
        FROM report_events e LEFT JOIN users u ON u.id = e.actor_id
       WHERE e.report_id = $1
       ORDER BY e.created_at, e.id`,
@@ -298,6 +310,15 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
 
   // The public only sees the part of the history that happened after publication.
   const visibleEvents = events.filter((e) => isOwner || privileged || isPublicStatus(e.to_status));
+  // Staff, moderators and admins get public credit for their changes; citizens stay anonymous.
+  const publicName = (e: { actor_name: string | null; actor_role: string | null }) =>
+    e.actor_role && e.actor_role !== "citizen" ? e.actor_name : null;
+  const note = (e: (typeof events)[number]): ReportNote => ({
+    id: String(e.id),
+    text: e.note ?? "",
+    createdAt: e.created_at.toISOString(),
+    actorName: e.actor_role === "citizen" ? "A resident" : e.actor_name,
+  });
 
   const detail: ReportDetail = {
     ...toSummary(row),
@@ -306,15 +327,18 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
     publishedAt: row.published_at ? row.published_at.toISOString() : null,
     updatedAt: row.updated_at.toISOString(),
     media: media.map((m) => ({ id: m.id, url: `/api/v1/media/${m.path}` })),
-    events: visibleEvents.map((e) => ({
-      id: String(e.id),
-      fromStatus: e.from_status,
-      toStatus: e.to_status,
-      note: e.note,
-      createdAt: e.created_at.toISOString(),
-      // Staff, moderators and admins get public credit for their changes; citizens stay anonymous.
-      actorName: e.actor_role && e.actor_role !== "citizen" ? e.actor_name : null,
-    })),
+    events: visibleEvents
+      .filter((e) => e.kind === "status")
+      .map((e) => ({
+        id: String(e.id),
+        fromStatus: e.from_status,
+        toStatus: e.to_status,
+        note: e.note,
+        createdAt: e.created_at.toISOString(),
+        actorName: publicName(e),
+      })),
+    feedback: visibleEvents.filter((e) => e.kind === "feedback").map(note),
+    followups: visibleEvents.filter((e) => e.kind === "followup").map(note),
     isOwner,
     canWithdraw: isOwner && CITIZEN_WITHDRAWABLE.includes(row.status),
   };
@@ -488,8 +512,8 @@ export async function transitionReport(
   if (!isUuid(id)) throw new HttpError(404, "Report not found");
 
   const result = await withTx(async (client) => {
-    const res = await client.query<{ status: Status; category_id: number }>(
-      "SELECT status, category_id FROM reports WHERE id = $1 FOR UPDATE",
+    const res = await client.query<{ status: Status; category_id: number; user_id: string }>(
+      "SELECT status, category_id, user_id FROM reports WHERE id = $1 FOR UPDATE",
       [id],
     );
     const current = res.rows[0]?.status;
@@ -498,8 +522,9 @@ export async function transitionReport(
     if (!TRANSITIONS[current].includes(to)) {
       throw new HttpError(409, `Cannot move a report from "${current}" to "${to}"`);
     }
-    // The state machine allows it; now check this user's role does too.
-    if (!allowedTransitions(effectiveRole(actor), current).includes(to)) {
+    // The state machine allows it; now check this user's role does too. The reporter may reopen their own resolved report.
+    const reopenOwn = current === "resolved" && to === "in_progress" && actor.userId === res.rows[0].user_id;
+    if (!reopenOwn && !allowedTransitions(effectiveRole(actor), current).includes(to)) {
       throw new HttpError(403, "Your role cannot make this change");
     }
     if (actor.role === "staff") {
@@ -531,6 +556,15 @@ export async function transitionReport(
       [id, to, duplicateOf ?? null],
     );
     await insertEvent(client, id, actor.userId, current, to, note ?? null);
+    if (to === "resolved") {
+      // Once per report: resolving again after a reopen awards nothing new.
+      for (const uid of new Set([res.rows[0].user_id, actor.userId])) {
+        await client.query(
+          "INSERT INTO point_awards (user_id, report_id, points, reason) VALUES ($1, $2, $3, 'resolved') ON CONFLICT DO NOTHING",
+          [uid, id, RESOLVE_POINTS],
+        );
+      }
+    }
     await queueStatusEmail(client, id, current, to, note ?? null);
     return { id, status: to };
   });
@@ -540,9 +574,26 @@ export async function transitionReport(
   return result;
 }
 
+/** Feedback or a follow-up request, kept in the report's log (report_events). Public reports only. */
+export async function addActivity(id: string, actor: Session, kind: "feedback" | "followup", text: string): Promise<void> {
+  if (!isUuid(id)) throw new HttpError(404, "Report not found");
+  const [row] = await query<{ status: Status }>("SELECT status FROM reports WHERE id = $1", [id]);
+  if (!row || !isPublicStatus(row.status)) throw new HttpError(404, "Report not found");
+  await query(
+    "INSERT INTO report_events (report_id, actor_id, from_status, to_status, note, kind) VALUES ($1, $2, NULL, $3, $4, $5)",
+    [id, actor.userId, row.status, text, kind],
+  );
+}
+
+export async function getPoints(userId: string): Promise<number> {
+  const [row] = await query<{ total: number }>("SELECT COALESCE(SUM(points), 0)::int AS total FROM point_awards WHERE user_id = $1", [userId]);
+  return row.total;
+}
+
 export interface AuditLogEntry {
   id: string;
   reportId: string;
+  kind: string;
   reportTitle: string;
   fromStatus: Status | null;
   toStatus: Status;
@@ -559,10 +610,11 @@ export async function listAuditLogs(limit = 100, offset = 0): Promise<AuditLogEn
     from_status: Status | null;
     to_status: Status;
     note: string | null;
+    kind: string;
     actor_name: string | null;
     created_at: Date;
   }>(
-    `SELECT e.id, e.report_id, r.title, e.from_status, e.to_status, e.note, u.name AS actor_name, e.created_at
+    `SELECT e.id, e.report_id, r.title, e.from_status, e.to_status, e.note, e.kind, u.name AS actor_name, e.created_at
        FROM report_events e
        JOIN reports r ON r.id = e.report_id
        LEFT JOIN users u ON u.id = e.actor_id
@@ -574,6 +626,7 @@ export async function listAuditLogs(limit = 100, offset = 0): Promise<AuditLogEn
     id: String(r.id),
     reportId: r.report_id,
     reportTitle: r.title,
+    kind: r.kind,
     fromStatus: r.from_status,
     toStatus: r.to_status,
     note: r.note,

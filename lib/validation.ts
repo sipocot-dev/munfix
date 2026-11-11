@@ -37,6 +37,8 @@ export const reportSchema = z.object({
 
 export const reportEditSchema = reportSchema.pick({ title: true, description: true, categorySlug: true, problemTypeSlug: true, address: true, barangay: true }).partial();
 
+export const communitySchema = z.object({ text: z.string().trim().min(1).max(1000) });
+
 export const transitionSchema = z.object({
   to: z.enum(STATUSES),
   note: z.string().trim().max(500).optional(),

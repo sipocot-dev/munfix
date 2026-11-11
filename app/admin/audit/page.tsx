@@ -74,6 +74,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   </Link>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">
+                  {e.kind !== "status" && <span className="font-semibold">{e.kind === "feedback" ? "Feedback" : "Follow-up request"}: </span>}
                   {e.fromStatus ? `${STATUS_LABEL[e.fromStatus]} → ` : ""}
                   <span className="font-semibold">{STATUS_LABEL[e.toStatus]}</span>
                 </td>
