@@ -3,12 +3,24 @@ import Explorer from "@/components/Explorer";
 import { MUNICIPALITY } from "@/lib/config";
 import { getStats, listCategories, listPublicReports } from "@/lib/reports";
 
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
+  // If the database is slow or down, still show the page instead of an error screen.
+  let degraded = false;
   const [reports, stats, categories] = await Promise.all([
     listPublicReports({ limit: 500 }),
     getStats(),
     listCategories(),
-  ]);
+  ]).catch((err) => {
+    degraded = true;
+    console.error("[home] could not load reports:", err instanceof Error ? err.message : err);
+    return [[], { verified: 0, inProgress: 0, resolved: 0, avgResolutionDays: null }, []] as unknown as [
+      Awaited<ReturnType<typeof listPublicReports>>,
+      Awaited<ReturnType<typeof getStats>>,
+      Awaited<ReturnType<typeof listCategories>>,
+    ];
+  });
 
   const tiles = [
     { label: "Verified", value: stats.verified, hint: "awaiting action", color: "#d97706" },
@@ -56,6 +68,12 @@ export default async function HomePage() {
           ))}
         </dl>
       </section>
+
+      {degraded && (
+        <p role="alert" className="mb-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Reports could not be loaded right now. Please refresh in a moment.
+        </p>
+      )}
 
       <div id="map" className="scroll-mt-24">
         <Explorer initialReports={reports} categories={categories} />

@@ -7,6 +7,8 @@ function create(): Redis {
     maxRetriesPerRequest: 2,
     enableOfflineQueue: false,
     lazyConnect: false,
+    connectTimeout: 5_000,
+    commandTimeout: 3_000,
   });
   client.on("error", (err) => {
     // Avoid crashing on connection errors; callers handle failed commands.

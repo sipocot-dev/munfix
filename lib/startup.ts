@@ -14,18 +14,26 @@ export async function startup(): Promise<void> {
   }
 
   if (process.env.AUTO_SETUP !== "false") {
-    // The database container may still be starting. Retry in the background instead of
-    // leaving the site half-migrated until someone restarts it.
-    const delays = [0, 2, 5, 10, 20, 30, 60, 60, 120];
-    for (const [i, wait] of delays.entries()) {
-      if (wait) await new Promise((r) => setTimeout(r, wait * 1000));
-      try {
-        await ensureDatabaseReady(pool, (m) => console.log(`[setup] ${m}`));
-        break;
-      } catch (err) {
-        // Keep serving: /api/health reports what is wrong without exposing details to visitors.
-        console.error(`[startup] Database setup failed (attempt ${i + 1}/${delays.length}):`, err instanceof Error ? err.message : err);
+    // Never hold up the server while the database is slow or unreachable: the first
+    // attempt gets a few seconds, then retries continue in the background. Pages that
+    // need a missing table also trigger setup themselves (see lib/db.ts).
+    const attempt = () => ensureDatabaseReady(pool, (m) => console.log(`[setup] ${m}`));
+    const retry = async () => {
+      for (const [i, wait] of [2, 5, 10, 20, 30, 60, 60, 120].entries()) {
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        try {
+          await attempt();
+          return;
+        } catch (err) {
+          console.error(`[startup] Database setup retry ${i + 1} failed:`, err instanceof Error ? err.message : err);
+        }
       }
+    };
+    try {
+      await Promise.race([attempt(), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("setup still running after 8s")), 8000))]);
+    } catch (err) {
+      console.error("[startup] Database setup not finished:", err instanceof Error ? err.message : err);
+      void retry();
     }
   }
 

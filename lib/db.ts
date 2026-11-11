@@ -20,7 +20,8 @@ export const pool: Pool =
     max: process.env.VERCEL ? 3 : 10,
     idleTimeoutMillis: 30_000,
     // Fail fast with a clear error instead of hanging when the database is unreachable.
-    connectionTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 8_000,
+    statement_timeout: 15_000,
   });
 
 if (process.env.NODE_ENV !== "production") g.__pgPool = pool;
