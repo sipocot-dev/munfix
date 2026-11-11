@@ -6,6 +6,7 @@ import type { Category, ReportSummary } from "@/lib/reports";
 import { glyphFor } from "@/lib/categoryIcons";
 import { createMap } from "@/lib/map";
 import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL } from "@/lib/status";
+import { withinBounds } from "@/lib/config";
 
 interface Props {
   reports: ReportSummary[];
@@ -105,6 +106,43 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
       mapRef.current = map;
       map.on("moveend", countVisible);
       map.on("rotate", () => setBearing(map.getBearing()));
+      map.on("click", (e) => {
+        // Clicks on pins stop propagating in the pin element, so this only fires on open map.
+        const { lng, lat } = e.lngLat;
+        popupRef.current?.remove();
+        popupRef.current = null;
+        onSelectRef.current(null);
+        const inside = withinBounds(lng, lat);
+        import("maplibre-gl").then(({ Popup }) => {
+          if (!mapRef.current) return;
+          const root = document.createElement("div");
+          root.style.cssText = "min-width:200px";
+          const head = document.createElement("div");
+          head.textContent = inside ? "Report an issue here?" : "Outside the municipality";
+          head.style.cssText = "font-weight:600;color:#0f172a";
+          const coords = document.createElement("div");
+          coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+          coords.style.cssText = "font-size:12px;color:#64748b;margin:2px 0 8px";
+          root.append(head, coords);
+          if (inside) {
+            const a = document.createElement("a");
+            a.href = `/report/new?lat=${lat}&lng=${lng}`;
+            a.textContent = "+ Report a problem here";
+            a.style.cssText = "display:inline-block;background:#ea580c;color:#fff;padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px;text-decoration:none";
+            root.append(a);
+          } else {
+            const note = document.createElement("div");
+            note.textContent = "Reports can only be placed inside the city.";
+            note.style.cssText = "font-size:12px;color:#64748b";
+            root.append(note);
+          }
+          const popup = new Popup({ offset: 8, closeButton: true, maxWidth: "260px" })
+            .setLngLat([lng, lat])
+            .setDOMContent(root)
+            .addTo(mapRef.current);
+          popupRef.current = popup;
+        });
+      });
       map.once("load", () => setReady(true));
       if (map.loaded()) setReady(true);
     })();

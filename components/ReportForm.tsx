@@ -11,10 +11,18 @@ import LocationPicker, { type LngLat } from "./LocationPicker";
 const MAX_FILES = 3;
 const MAX_BYTES = 5 * 1024 * 1024;
 
-export default function ReportForm({ categories, problemTypes }: { categories: Category[]; problemTypes: ProblemType[] }) {
+export default function ReportForm({
+  categories,
+  problemTypes,
+  initialLocation = null,
+}: {
+  categories: Category[];
+  problemTypes: ProblemType[];
+  initialLocation?: LngLat | null;
+}) {
   const [categorySlug, setCategorySlug] = useState("");
   const router = useRouter();
-  const [location, setLocation] = useState<LngLat | null>(null);
+  const [location, setLocation] = useState<LngLat | null>(initialLocation);
   const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -51,7 +59,8 @@ export default function ReportForm({ categories, problemTypes }: { categories: C
       const res = await fetch("/api/v1/reports", { method: "POST", body: form });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
-        router.push("/login?next=/report/new");
+        const back = location ? `/report/new?lat=${location.lat}&lng=${location.lng}` : "/report/new";
+        router.push(`/login?next=${encodeURIComponent(back)}`);
         return;
       }
       if (!res.ok) {

@@ -31,6 +31,8 @@ export default function Explorer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [panel, setPanel] = useState<"filters" | "list" | null>(null);
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const first = useRef(true);
   const requestId = useRef(0);
 
@@ -68,6 +70,21 @@ export default function Explorer({
     });
   }
 
+  const needle = query.trim().toLowerCase();
+  const matches = needle
+    ? reports
+        .filter((r) =>
+          [r.title, r.categoryName, r.problemType, r.barangay, r.address].some((v) => v?.toLowerCase().includes(needle)),
+        )
+        .slice(0, 8)
+    : [];
+
+  function pick(id: string) {
+    setSelectedId(id);
+    setQuery("");
+    setSearchOpen(false);
+  }
+
   const filtered = statuses.length < PUBLIC_STATUSES.length || category !== "";
   const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-md ring-1 ring-black/5 hover:bg-slate-50";
 
@@ -82,6 +99,34 @@ export default function Explorer({
       />
 
       <div className="absolute left-3 top-3 flex w-[calc(100%-13rem)] min-w-[220px] max-w-sm flex-col gap-2 sm:w-96">
+        <div className="relative">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setSearchOpen(true);
+            }}
+            onFocus={() => setSearchOpen(true)}
+            onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+            placeholder="Search problems, places, barangays…"
+            aria-label="Search reports"
+            className="w-full rounded-xl bg-white px-4 py-2.5 text-sm shadow-md ring-1 ring-black/5 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-600"
+          />
+          {searchOpen && needle && (
+            <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5">
+              {matches.length === 0 && <li className="px-4 py-2 text-slate-500">No matching reports on the map.</li>}
+              {matches.map((r) => (
+                <li key={r.id}>
+                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(r.id)} className="block w-full px-4 py-2 text-left hover:bg-slate-50">
+                    <span className="block truncate font-medium">{r.title}</span>
+                    <span className="block truncate text-xs text-slate-500">{[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <div className="flex gap-2">
           <button type="button" className={btn} aria-expanded={panel === "filters"} onClick={() => setPanel(panel === "filters" ? null : "filters")}>
             Filters{filtered && <span className="h-2 w-2 rounded-full bg-orange-500" aria-label="active" />}

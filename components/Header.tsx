@@ -41,8 +41,8 @@ export default async function Header() {
           </nav>
 
           <div className="flex items-center gap-2 text-sm">
-            <Link href="/report/new" className="btn btn-primary !py-1.5">
-              Report an issue
+            <Link href="/report/new" className="inline-flex items-center gap-1 rounded-lg bg-orange-600 px-3.5 py-1.5 font-semibold text-white hover:bg-orange-700">
+              <span aria-hidden>+</span> Report Issue
             </Link>
             {session ? (
               <>
