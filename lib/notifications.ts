@@ -1,3 +1,4 @@
+import { after } from "next/server";
 import type { PoolClient } from "pg";
 import { query, withTx } from "./db";
 import { statusEmail } from "./email-templates";
@@ -146,7 +147,14 @@ async function drainBatches(): Promise<number> {
 /** Fire-and-forget: try to send right after a change commits, without delaying the response. */
 export function triggerDrain(): void {
   if (!mailEnabled()) return;
-  drainOutbox().catch((err) => console.error("[mail] drain failed:", err));
+  const run = () => drainOutbox().catch((err) => console.error("[mail] drain failed:", err));
+  // On serverless hosts the instance freezes once the response is sent, so ask the
+  // framework to keep it alive until the drain finishes.
+  try {
+    after(run);
+  } catch {
+    void run();
+  }
 }
 
 /** Background loop for retries and housekeeping. Started once from instrumentation.ts. */

@@ -2,11 +2,22 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 const g = globalThis as unknown as { __pgPool?: Pool };
 
+/**
+ * Connection string from DATABASE_URL, or the names Vercel's Postgres/Prisma integrations set.
+ * Direct URLs are preferred over pooled ones: migrations use advisory locks, which a
+ * transaction-pooling proxy (pgbouncer) does not keep on one connection.
+ */
+export function databaseUrl(): string | undefined {
+  const e = process.env;
+  return e.DATABASE_URL || e.POSTGRES_URL_NON_POOLING || e.POSTGRES_URL || e.PRISMA_DATABASE_URL || e.DATABASE_URL_POOLED || undefined;
+}
+
 export const pool: Pool =
   g.__pgPool ??
   new Pool({
-    connectionString: process.env.DATABASE_URL,
-    max: 10,
+    connectionString: databaseUrl(),
+    // Serverless platforms run many instances; keep each one's share of the connection limit small.
+    max: process.env.VERCEL ? 3 : 10,
     idleTimeoutMillis: 30_000,
     // Fail fast with a clear error instead of hanging when the database is unreachable.
     connectionTimeoutMillis: 10_000,
@@ -25,7 +36,7 @@ let lastHeal = 0;
 
 /** Applies pending migrations once (at most every 30 s) when a query shows the schema is out of date. */
 async function healSchema(): Promise<boolean> {
-  if (process.env.AUTO_SETUP === "false" || !process.env.DATABASE_URL) return false;
+  if (process.env.AUTO_SETUP === "false" || !databaseUrl()) return false;
   if (!healing) {
     if (Date.now() - lastHeal < 30_000) return false;
     lastHeal = Date.now();

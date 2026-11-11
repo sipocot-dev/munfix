@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { query } from "@/lib/db";
+import { databaseUrl, query } from "@/lib/db";
 import { redis } from "@/lib/redis";
 import { migrationFiles } from "@/lib/setup";
 
@@ -15,8 +15,8 @@ const timeout = <T>(p: Promise<T>, ms = 4000): Promise<T> =>
 export async function GET() {
   const checks: Record<string, string> = {};
 
-  if (!process.env.DATABASE_URL) {
-    checks.database = "error: DATABASE_URL is not set";
+  if (!databaseUrl()) {
+    checks.database = "error: DATABASE_URL (or POSTGRES_URL) is not set";
   } else {
     try {
       await timeout(query("SELECT 1"));
@@ -44,6 +44,10 @@ export async function GET() {
     checks.redis = "ok";
   } catch {
     checks.redis = "error: unreachable (sessions and login will not work)";
+  }
+
+  if (process.env.VERCEL && (process.env.STORAGE_DRIVER ?? "local") === "local") {
+    checks.storage = "warning: photo uploads need STORAGE_DRIVER=s3 on Vercel (local disk is read-only)";
   }
 
   const healthy = checks.database === "ok" && checks.migrations === "ok";

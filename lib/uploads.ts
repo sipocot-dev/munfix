@@ -29,6 +29,7 @@ const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR ?? path.join(process.cwd(
 
 const localStore: Store = {
   async put(name, data) {
+    if (process.env.VERCEL) throw new HttpError(503, "Photo uploads are not configured yet. Submit the report without photos for now.");
     await mkdir(UPLOAD_DIR, { recursive: true });
     await writeFile(path.join(UPLOAD_DIR, name), data, { flag: "wx" });
   },

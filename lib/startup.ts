@@ -1,4 +1,4 @@
-import { pool } from "./db";
+import { databaseUrl, pool } from "./db";
 import { startMailWorker } from "./notifications";
 import { ensureDatabaseReady } from "./setup";
 
@@ -8,8 +8,8 @@ import { ensureDatabaseReady } from "./setup";
  * Set AUTO_SETUP=false to manage migrations yourself (`npm run db:migrate`).
  */
 export async function startup(): Promise<void> {
-  if (!process.env.DATABASE_URL) {
-    console.error("[startup] DATABASE_URL is not set. Pages that read reports will fail until it is configured.");
+  if (!databaseUrl()) {
+    console.error("[startup] DATABASE_URL (or POSTGRES_URL) is not set. Pages that read reports will fail until it is configured.");
     return;
   }
 
