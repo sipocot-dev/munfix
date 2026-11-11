@@ -1,4 +1,3 @@
-import bcrypt from "bcryptjs";
 import type { PoolClient } from "pg";
 import { pool } from "../lib/db";
 import { seedEssentials } from "../lib/setup";
@@ -36,20 +35,11 @@ async function seedDemo(client: Client) {
   const lng = Number(process.env.NEXT_PUBLIC_MAP_CENTER_LNG ?? 122.9833);
   const lat = Number(process.env.NEXT_PUBLIC_MAP_CENTER_LAT ?? 13.7667);
 
-  await client.query(
-    `INSERT INTO users (email, name, password_hash, role) VALUES ('demo.citizen@munfix.local', 'Demo Citizen', $1, 'citizen')
-     ON CONFLICT DO NOTHING RETURNING id`,
-    [await bcrypt.hash("demo-password", 10)],
-  );
-  for (const [email, name, role] of [
-    ["demo.moderator@munfix.local", "Demo Moderator", "moderator"],
-    ["demo.staff@munfix.local", "Demo Field Staff", "staff"],
-  ] as const) {
-    await client.query(`INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, [email, name, await bcrypt.hash("demo-password", 10), role]);
-  }
+  // Reports are written by the admin account, so no demo logins are created on the live site.
   const admin = await client.query<{ id: string }>("SELECT id FROM users WHERE role = 'admin' ORDER BY created_at LIMIT 1");
-  const userId = (await client.query<{ id: string }>("SELECT id FROM users WHERE lower(email) = 'demo.citizen@munfix.local'")).rows[0].id;
-  const adminId = admin.rows[0]?.id ?? userId;
+  if (!admin.rows[0]) throw new Error("Create the admin account first (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD).");
+  const userId = admin.rows[0].id;
+  const adminId = userId;
 
   const demo: [cat: string, title: string, description: string, dLng: number, dLat: number, status: string, barangay: string][] = [
     ["roads", "Large pothole near the public market", "A deep pothole has formed on the main road next to the market entrance and is a hazard for tricycles and motorcycles.", 0.004, 0.002, "verified", "North Centro"],
@@ -81,7 +71,7 @@ async function seedDemo(client: Client) {
       if (step === status) break;
     }
   }
-  console.log(`Seeded ${demo.length} demo reports (login: demo.citizen@munfix.local / demo-password).`);
+  console.log(`Seeded ${demo.length} demo reports.`);
 }
 
 main().catch((err) => {
