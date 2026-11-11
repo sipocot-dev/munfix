@@ -43,15 +43,21 @@ export async function createMap(
     interactive: opts.interactive ?? true,
   });
   if (opts.vector) {
-    // If the vector style cannot be fetched, fall back to the plain OpenStreetMap tiles.
+    // The vector style is a third-party service. If it is slow, blocked, or has a
+    // style error, switch to the plain raster basemap so the map still loads.
     let fell = false;
+    const fallback = () => {
+      if (fell) return;
+      fell = true;
+      map.setStyle(baseStyle());
+    };
+    const timer = setTimeout(() => {
+      if (!map.isStyleLoaded()) fallback();
+    }, 8000);
+    map.once("style.load", () => clearTimeout(timer));
     map.on("error", (e) => {
-      if (fell || map.isStyleLoaded()) return;
       const msg = String((e as { error?: Error }).error?.message ?? "");
-      if (/style|fetch|Failed|NetworkError/i.test(msg)) {
-        fell = true;
-        map.setStyle(baseStyle());
-      }
+      if (!map.isStyleLoaded() || /Expected value|style|expression|layer/i.test(msg)) fallback();
     });
   }
   if (opts.interactive !== false && opts.controls !== false) {

@@ -5,21 +5,18 @@ import { getStats, listCategories, listPublicReports } from "@/lib/reports";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  // If the database is slow or down, still show the page instead of an error screen.
+  // Each part loads on its own: if stats fail, the map and reports still show.
   let degraded = false;
-  const [reports, stats, categories] = await Promise.all([
-    listPublicReports({ limit: 500 }),
-    getStats(),
-    listCategories(),
-  ]).catch((err) => {
+  const fail = <T,>(what: string, fallback: T) => (err: unknown) => {
     degraded = true;
-    console.error("[home] could not load reports:", err instanceof Error ? err.message : err);
-    return [[], { verified: 0, inProgress: 0, resolved: 0, avgResolutionDays: null }, []] as unknown as [
-      Awaited<ReturnType<typeof listPublicReports>>,
-      Awaited<ReturnType<typeof getStats>>,
-      Awaited<ReturnType<typeof listCategories>>,
-    ];
-  });
+    console.error(`[home] could not load ${what}:`, err instanceof Error ? err.message : err);
+    return fallback;
+  };
+  const [reports, stats, categories] = await Promise.all([
+    listPublicReports({ limit: 500 }).catch(fail("reports", [] as Awaited<ReturnType<typeof listPublicReports>>)),
+    getStats().catch(fail("stats", { verified: 0, inProgress: 0, resolved: 0, avgResolutionDays: null })),
+    listCategories().catch(fail("categories", [] as Awaited<ReturnType<typeof listCategories>>)),
+  ]);
 
   return (
     <>

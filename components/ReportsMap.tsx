@@ -143,8 +143,9 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
           popupRef.current = popup;
         });
       });
-      map.once("load", () => setReady(true));
-      if (map.loaded()) setReady(true);
+      // Pins can be added as soon as the style exists; tiles may still be loading.
+      map.once("style.load", () => setReady(true));
+      if (map.isStyleLoaded()) setReady(true);
     })();
     const markers = markersRef.current;
     return () => {
