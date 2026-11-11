@@ -1,8 +1,10 @@
 export async function register() {
   // Only the Node.js server runtime can reach Postgres and SMTP, and `next build` must not need a database.
-  if (process.env.NEXT_RUNTIME !== "nodejs" || process.env.NEXT_PHASE === "phase-production-build") return;
-  const { startup } = await import("./lib/startup");
-  await startup();
+  // The import sits inside the branch so the edge bundle does not pull in pg (it needs fs).
+  if (process.env.NEXT_RUNTIME === "nodejs" && process.env.NEXT_PHASE !== "phase-production-build") {
+    const { startup } = await import("./lib/startup");
+    await startup();
+  }
 }
 
 /** Logs the real error behind "Something went wrong" pages. The page only shows a digest; match it to this line. */

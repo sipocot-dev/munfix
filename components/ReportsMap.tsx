@@ -292,7 +292,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
 
   return (
     <div className={`relative ${className ?? ""}`}>
-      <div ref={el} className="absolute inset-0 bg-[#e8ecef]" role="application" aria-label="Map of reported issues" />
+      <div ref={el} className="h-full w-full bg-[#e8ecef]" role="application" aria-label="Map of reported issues" />
 
       {tileErrors >= 3 && (
         <p role="status" className="absolute bottom-6 left-1/2 max-w-sm -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-600 shadow-md">
