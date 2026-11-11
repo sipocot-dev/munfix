@@ -19,8 +19,14 @@ export function baseStyle(): StyleSpecification {
   };
 }
 
-/** OpenFreeMap vector style (free, no key): detailed labels and 3D buildings. */
+/** OpenFreeMap vector style (free, no key). Opt-in with NEXT_PUBLIC_MAP_STYLE=vector. */
 export const VECTOR_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+
+/**
+ * Raster tiles are the default because they render reliably. The vector style needs its own
+ * fonts, sprites and worker-side layers, and failed silently on some browsers.
+ */
+export const USE_VECTOR_MAP = process.env.NEXT_PUBLIC_MAP_STYLE === "vector";
 
 export async function createMap(
   container: HTMLElement,
@@ -29,9 +35,10 @@ export async function createMap(
   const { Map, NavigationControl } = await import("maplibre-gl");
   const [minLng, minLat, maxLng, maxLat] = MUNICIPALITY.bounds;
   const pad = 0.1;
+  const useVector = Boolean(opts.vector && USE_VECTOR_MAP);
   const map = new Map({
     container,
-    style: opts.vector ? VECTOR_STYLE_URL : baseStyle(),
+    style: useVector ? VECTOR_STYLE_URL : baseStyle(),
     center: opts.center ?? MUNICIPALITY.center,
     zoom: opts.zoom ?? 11.5,
     minZoom: 9,
@@ -40,9 +47,11 @@ export async function createMap(
       [maxLng + pad, maxLat + pad],
     ],
     attributionControl: { compact: true },
+    // Shows through while tiles load, so an unloaded map is never a blank white box.
+    fadeDuration: 150,
     interactive: opts.interactive ?? true,
   });
-  if (opts.vector) {
+  if (useVector) {
     // The vector style is a third-party service. If it is slow, blocked, or has a
     // style error, switch to the plain raster basemap so the map still loads.
     let fell = false;

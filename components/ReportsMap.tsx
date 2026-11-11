@@ -75,6 +75,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
   const reportsRef = useRef(reports);
   const onSelectRef = useRef(onSelect);
   const [ready, setReady] = useState(false);
+  const [tileErrors, setTileErrors] = useState(0);
   const [visible, setVisible] = useState(reports.length);
   const [pitched, setPitched] = useState(false);
   const [terrain, setTerrain] = useState(false);
@@ -99,6 +100,11 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
     (async () => {
       if (!el.current) return;
       const map = await createMap(el.current, { controls: false, vector: true });
+      map.on("error", (e) => {
+        // Count failed tile requests so the page can say the basemap is unavailable.
+        const err = e as { error?: Error; tile?: unknown };
+        if (err.tile) setTileErrors((n) => n + 1);
+      });
       if (cancelled) {
         map.remove();
         return;
@@ -286,7 +292,13 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
 
   return (
     <div className={`relative ${className ?? ""}`}>
-      <div ref={el} className="absolute inset-0" role="application" aria-label="Map of reported issues" />
+      <div ref={el} className="absolute inset-0 bg-[#e8ecef]" role="application" aria-label="Map of reported issues" />
+
+      {tileErrors >= 3 && (
+        <p role="status" className="absolute bottom-6 left-1/2 max-w-sm -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-600 shadow-md">
+          The street map is slow to load. Your reports are still shown on the pins.
+        </p>
+      )}
 
       <div className="pointer-events-none absolute right-3 top-3 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-md ring-1 ring-black/5" aria-live="polite">
         {visible} report{visible === 1 ? "" : "s"} visible
