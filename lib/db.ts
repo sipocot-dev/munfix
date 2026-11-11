@@ -52,6 +52,14 @@ async function healSchema(): Promise<boolean> {
   return true;
 }
 
+/** Connection drops that a fresh connection usually fixes (idle sockets on serverless hosts, cold starts). */
+function isTransient(err: unknown): boolean {
+  const e = err as { code?: string; message?: string } | undefined;
+  if (!e) return false;
+  if (["ECONNRESET", "EPIPE", "ETIMEDOUT", "ECONNREFUSED", "57P01", "57P03", "08000", "08003", "08006"].includes(e.code ?? "")) return true;
+  return /Connection terminated|timeout expired|Client has encountered a connection error/i.test(e.message ?? "");
+}
+
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params: unknown[] = [],
@@ -60,6 +68,11 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
     return (await pool.query<T>(text, params)).rows;
   } catch (err) {
     if (isSchemaBehind(err) && (await healSchema())) return (await pool.query<T>(text, params)).rows;
+    if (isTransient(err)) {
+      // One retry on a fresh connection. Reads only: writes may already have happened.
+      await new Promise((r) => setTimeout(r, 300));
+      if (/^\s*(select|with)\b/i.test(text)) return (await pool.query<T>(text, params)).rows;
+    }
     throw err;
   }
 }
