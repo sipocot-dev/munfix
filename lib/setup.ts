@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Pool, PoolClient } from "pg";
+import { DB_SCHEMA } from "./db";
 import { hashPassword, isStrongBootstrapPassword } from "./passwords";
 
 /** Arbitrary constant; serialises setup across app instances starting at the same time. */
@@ -169,6 +170,8 @@ export async function ensureDatabaseReady(pool: Pool, log: Log = console.log): P
   const client = await pool.connect();
   try {
     await client.query("SELECT pg_advisory_lock($1)", [SETUP_LOCK]);
+    // Create MunFix's schema first; see DB_SCHEMA in lib/db.ts.
+    await client.query(`CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA}`);
     const ran = await runMigrations(client, log);
     if (ran > 0) log(`Applied ${ran} migration(s).`);
     await client.query("BEGIN");

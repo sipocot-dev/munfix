@@ -12,9 +12,24 @@ export function databaseUrl(): string | undefined {
   return e.DATABASE_URL || e.POSTGRES_URL_NON_POOLING || e.POSTGRES_URL || e.PRISMA_DATABASE_URL || e.DATABASE_URL_POOLED || undefined;
 }
 
+/**
+ * MunFix keeps its tables in their own Postgres schema. Databases are often shared with
+ * other projects (a `users` table from another app made the first migration fail), so
+ * every connection points at this schema instead of `public`.
+ */
+export const DB_SCHEMA = (process.env.DATABASE_SCHEMA ?? "munfix").trim();
+if (!/^[a-z_][a-z0-9_]{0,62}$/.test(DB_SCHEMA)) throw new Error("DATABASE_SCHEMA must be a plain lowercase name, e.g. munfix");
+
+function withSchema(pool: Pool): Pool {
+  pool.on("connect", (client) => {
+    client.query(`SET search_path TO ${DB_SCHEMA}`).catch((err) => console.error("[db] could not set search_path:", err.message));
+  });
+  return pool;
+}
+
 export const pool: Pool =
   g.__pgPool ??
-  new Pool({
+  withSchema(new Pool({
     connectionString: databaseUrl(),
     // Serverless platforms run many instances; keep each one's share of the connection limit small.
     max: process.env.VERCEL ? 3 : 10,
@@ -22,7 +37,7 @@ export const pool: Pool =
     // Fail fast with a clear error instead of hanging when the database is unreachable.
     connectionTimeoutMillis: 8_000,
     statement_timeout: 15_000,
-  });
+  }));
 
 if (process.env.NODE_ENV !== "production") g.__pgPool = pool;
 
