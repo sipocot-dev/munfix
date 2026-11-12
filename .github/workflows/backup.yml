@@ -1,0 +1,35 @@
+name: Database backup
+
+on:
+  schedule:
+    - cron: "17 18 * * *" # 02:17 Asia/Manila (UTC+8), daily
+  workflow_dispatch:
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ vars.BACKUP_S3_REGION }}
+    steps:
+      - name: Install pg_dump 16
+        run: |
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /usr/share/keyrings/pgdg.gpg
+          sudo sed -i 's|deb https|deb [signed-by=/usr/share/keyrings/pgdg.gpg] https|' /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-16
+      - name: Dump the munfix schema and upload
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BUCKET: ${{ vars.BACKUP_S3_BUCKET }}
+          ENDPOINT: ${{ vars.BACKUP_S3_ENDPOINT }}
+        run: |
+          FILE="munfix-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+          # Plain SQL, compressed; --no-owner keeps restores portable. Only the app schema is dumped.
+          pg_dump "$DATABASE_URL" --schema=munfix --no-owner --no-privileges | gzip -9 > "$FILE"
+          test -s "$FILE"
+          EXTRA=""; [ -n "$ENDPOINT" ] && EXTRA="--endpoint-url $ENDPOINT"
+          aws s3 cp "$FILE" "s3://$BUCKET/backups/$FILE" $EXTRA
+          echo "Uploaded $FILE ($(stat -c %s "$FILE") bytes)"
