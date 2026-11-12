@@ -26,7 +26,7 @@
     "@vercel/functions": "^3.11.1",
     "@vercel/speed-insights": "^2.1.0",
     "bcryptjs": "^3.0.2",
-    "ioredis": "^5.4.1",
+    "ioredis": "^6.0.0",
     "maplibre-gl": "6.18.0",
     "next": "^16.4.5",
     "nodemailer": "^10.4.0",
