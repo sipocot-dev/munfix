@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProgressSteps from "@/components/ProgressSteps";
 import LocationCard from "@/components/LocationCard";
+import ShareReport from "@/components/ShareReport";
 import PhotoGallery from "@/components/PhotoGallery";
 import StaticMap from "@/components/StaticMap";
 import StatusBadge from "@/components/StatusBadge";
@@ -101,7 +102,8 @@ export default async function ReportPage({ params }: Props) {
 
         <aside className="space-y-6">
           <StaticMap lng={report.lng} lat={report.lat} status={report.status} />
-          <LocationCard title={report.title} lat={report.lat} lng={report.lng} address={report.address} />
+          <LocationCard lat={report.lat} lng={report.lng} address={report.address} />
+          <ShareReport title={report.title} />
 
           {isStaffRole(session?.role) && report.allowedTransitions && (
             <section className="card space-y-3 p-5">
