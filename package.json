@@ -26,9 +26,9 @@
     "@vercel/functions": "^3.11.1",
     "@vercel/speed-insights": "^2.1.0",
     "bcryptjs": "^3.0.2",
-    "ioredis": "^6.0.0",
+    "ioredis": "^5.11.1",
     "maplibre-gl": "6.18.0",
-    "next": "^16.4.5",
+    "next": "^15.5.29",
     "nodemailer": "^10.4.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",
@@ -37,15 +37,15 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
-    "@types/node": "^26.6.6",
+    "@types/node": "^22.20.5",
     "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.11.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^7.0.2",
-    "vitest": "^5.1.0"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
   },
   "overrides": {
     "postcss": "^8.5.32"

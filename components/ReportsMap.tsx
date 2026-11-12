@@ -29,15 +29,27 @@ function pinElement(r: ReportSummary): HTMLButtonElement {
     <path d="M17 43C17 43 2 28 2 16a15 15 0 0 1 30 0c0 12-15 27-15 27Z" fill="${color}" stroke="#fff" stroke-width="2"/>
     <circle cx="17" cy="16" r="10" fill="#fff"/>
     <text x="17" y="21" text-anchor="middle" font-size="13">${glyphFor(r.categorySlug)}</text></svg>`;
-  // Hover/focus card with the photo and details; it does not move the pin.
-  const card = popupNode(r);
-  card.style.cssText = "display:none;position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:8px;width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
-  const show = (on: boolean) => () => (card.style.display = on ? "block" : "none");
+  // Hover/focus card with the photo and details; it does not move the pin. Built on first hover,
+  // so a map of hundreds of pins does not request every thumbnail up front.
+  let card: HTMLElement | null = null;
+  const show = (on: boolean) => () => {
+    if (on && !card) {
+      card = popupNode(r);
+      card.style.cssText = "position:absolute;left:50%;transform:translateX(-50%);width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
+      el.append(card);
+    }
+    if (!card) return;
+    // Near the top edge of the map there is no room above the pin, so open the card below it.
+    const below = on && el.getBoundingClientRect().top < 260;
+    card.style.top = below ? "100%" : "";
+    card.style.bottom = below ? "" : "100%";
+    card.style.margin = below ? "8px 0 0" : "0 0 8px";
+    card.style.display = on ? "block" : "none";
+  };
   el.addEventListener("mouseenter", show(true));
   el.addEventListener("focus", show(true));
   el.addEventListener("mouseleave", show(false));
   el.addEventListener("blur", show(false));
-  el.append(card);
   return el;
 }
 
@@ -224,7 +236,8 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
       old.remove();
     }
 
-    const report = selectedId ? reports.find((r) => r.id === selectedId) : undefined;
+    // Read the list through the ref: a filter change must not re-open the popup or move the map.
+    const report = selectedId ? reportsRef.current.find((r) => r.id === selectedId) : undefined;
     if (!report) return;
 
     let cancelled = false;
@@ -247,7 +260,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
     return () => {
       cancelled = true;
     };
-  }, [selectedId, ready, reports]);
+  }, [selectedId, ready]);
 
   function toggle3d() {
     const map = mapRef.current;
@@ -305,7 +318,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
       <div ref={el} className="h-full w-full bg-[#e8ecef]" role="application" aria-label="Map of reported issues" />
 
       {tileErrors >= 3 && (
-        <p role="status" className="absolute bottom-6 left-1/2 max-w-sm -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-600 shadow-md">
+        <p role="status" className="absolute bottom-20 left-1/2 max-w-sm -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-600 shadow-md">
           The street map is slow to load. Your reports are still shown on the pins.
         </p>
       )}
