@@ -60,7 +60,7 @@ function createS3Store(): Store {
 
   // Loaded lazily so deployments using local storage never load the SDK.
   const getClient = () =>
-    (clientPromise ??= import("@aws-sdk/client-s3").then((sdk) => {
+    (clientPromise ??= Promise.all([import("@aws-sdk/client-s3"), import("@vercel/functions/oidc")]).then(([sdk, oidc]) => {
       const accessKeyId = process.env.S3_ACCESS_KEY_ID;
       const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY;
       return {
@@ -72,8 +72,14 @@ function createS3Store(): Store {
           // The SDK's newer default checksums are rejected by some S3-compatible services.
           requestChecksumCalculation: "WHEN_REQUIRED",
           responseChecksumValidation: "WHEN_REQUIRED",
-          // Without explicit keys the SDK falls back to its default credential chain (IAM roles, etc.).
-          credentials: accessKeyId && secretAccessKey ? { accessKeyId, secretAccessKey } : undefined,
+          // On Vercel with the AWS integration, AWS_ROLE_ARN is set and Vercel's OIDC token assumes that role.
+          // Otherwise the SDK's default credential chain applies.
+          credentials:
+            accessKeyId && secretAccessKey
+              ? { accessKeyId, secretAccessKey }
+              : process.env.AWS_ROLE_ARN
+                ? oidc.awsCredentialsProvider({ roleArn: process.env.AWS_ROLE_ARN })
+                : undefined,
         }),
       };
     }));
