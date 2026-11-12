@@ -32,7 +32,9 @@ export async function createMap(
   container: HTMLElement,
   opts: { center?: [number, number]; zoom?: number; interactive?: boolean; controls?: boolean; vector?: boolean } = {},
 ): Promise<MlMap> {
-  const { Map, NavigationControl } = await import("maplibre-gl");
+  const { Map, NavigationControl, setWorkerUrl } = await import("maplibre-gl");
+  // Served from public/ (copied from node_modules/maplibre-gl/dist); MapLibre 6 loads its worker from a file.
+  setWorkerUrl("/maplibre-gl-worker.mjs");
   const [minLng, minLat, maxLng, maxLat] = MUNICIPALITY.bounds;
   const pad = 0.1;
   const useVector = Boolean(opts.vector && USE_VECTOR_MAP);
@@ -65,7 +67,7 @@ export async function createMap(
     }, 8000);
     map.once("style.load", () => clearTimeout(timer));
     map.on("error", (e) => {
-      const msg = String((e as { error?: Error }).error?.message ?? "");
+      const msg = String((e as unknown as { error?: Error }).error?.message ?? "");
       if (!map.isStyleLoaded() || /Expected value|style|expression|layer/i.test(msg)) fallback();
     });
   }

@@ -112,7 +112,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
       const map = await createMap(el.current, { controls: false, vector: true });
       map.on("error", (e) => {
         // Count failed tile requests so the page can say the basemap is unavailable.
-        const err = e as { error?: Error; tile?: unknown };
+        const err = e as unknown as { error?: Error; tile?: unknown };
         if (err.tile) setTileErrors((n) => n + 1);
       });
       if (cancelled) {

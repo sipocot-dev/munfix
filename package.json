@@ -11,6 +11,8 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "services:up": "docker compose up -d db redis",
     "services:down": "docker compose down",
     "db:migrate": "tsx --env-file-if-exists=.env scripts/migrate.ts",
@@ -25,14 +27,13 @@
     "@vercel/speed-insights": "^2.1.0",
     "bcryptjs": "^3.0.2",
     "ioredis": "^5.4.1",
-    "maplibre-gl": "^5.0.0",
+    "maplibre-gl": "6.18.0",
     "next": "^15.5.0",
     "nodemailer": "^10.4.0",
     "pg": "^8.13.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "workflow": "^5.5.0",
-    "zod": "^3.24.0"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
@@ -43,6 +44,10 @@
     "@types/react-dom": "^19.0.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^5.6.0",
+    "vitest": "^3.2.7"
+  },
+  "overrides": {
+    "postcss": "^8.5.32"
   }
 }
