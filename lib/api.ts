@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { randomUUID } from "node:crypto";
 import { ZodError } from "zod";
 import { HttpError } from "./errors";
+import { logger } from "./logger";
 import type { Role } from "./permissions";
 import { getSession, type Session } from "./session";
 
@@ -22,8 +24,10 @@ export function route<C = unknown>(fn: (req: NextRequest, ctx: C) => Promise<Res
           { status: 400 },
         );
       }
-      console.error("[api]", err);
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+      // The request id goes back to the caller so a support report can be matched to this log line.
+      const requestId = req.headers.get("x-request-id") ?? randomUUID();
+      logger.error("unhandled error", { requestId, method: req.method, path: new URL(req.url).pathname, err });
+      return NextResponse.json({ error: "Internal server error", requestId }, { status: 500, headers: { "x-request-id": requestId } });
     }
   };
 }
