@@ -4,7 +4,7 @@ Reviewed in November 2026 against the code in `lib/session.ts`, `lib/passwords.t
 
 ## What is in place
 
-- **Session cookie:** httpOnly, SameSite=lax, Secure in production, 1-hour-to-configured TTL. The server stores only a SHA-256 hash of the token in Redis (`sess:<hash>`), so a Redis dump does not reveal live tokens.
+- **Session cookie:** httpOnly, SameSite=lax, Secure in production, 7-day TTL. The server stores only a SHA-256 hash of the token in Redis (`sess:<hash>`), so a Redis dump does not reveal live tokens.
 - **Passwords:** bcrypt with cost 11. Reset tokens are single use.
 - **Rate limits:** login (per IP and per email), registration, password reset, OAuth callback. Fixed-window counters in Redis. The limiter fails open if Redis is down, which keeps the site up but removes the limit during an outage.
 - **Headers:** X-Frame-Options DENY and related headers in `next.config.ts`.
