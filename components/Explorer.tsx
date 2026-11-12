@@ -91,8 +91,26 @@ export default function Explorer({
   const filtered = statuses.join() !== DEFAULT_STATUSES.join() || category !== "";
   const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 panel hover:bg-slate-50";
 
+  // Stats on the map (desktop) and in the list panel (phones): one definition, two places.
+  const statCells = (floating: boolean) => (
+    <dl className={floating ? "hidden grid-cols-4 gap-3 rounded-xl bg-white p-3 text-center shadow-lg ring-1 ring-black/5 sm:grid" : "grid grid-cols-4 gap-2 border-b border-slate-100 p-3 text-center"}>
+      {[
+        ["Verified", stats.verified, "#d97706"],
+        ["In progress", stats.inProgress, "#2563eb"],
+        ["Resolved", stats.resolved, "#16a34a"],
+        ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#1d3557"],
+      ].map(([label, value, color]) => (
+        <div key={label as string}>
+          <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
+          <dt className="text-[11px] text-slate-500">{label}</dt>
+        </div>
+      ))}
+    </dl>
+  );
+
   return (
     <section aria-label="Reports map" className="relative h-[calc(100svh-4rem)] min-h-[480px]">
+      <div className="absolute right-3 top-3 z-10">{statCells(true)}</div>
       <ReportsMap
         reports={reports}
         categories={categories}
@@ -178,19 +196,7 @@ export default function Explorer({
 
         {panel === "list" && (
           <div className="flex max-h-[calc(100svh-11rem)] flex-col rounded-xl bg-white shadow-lg ring-1 ring-black/5">
-            <dl className="grid grid-cols-4 gap-2 border-b border-slate-100 p-3 text-center">
-              {[
-                ["Verified", stats.verified, "#d97706"],
-                ["In progress", stats.inProgress, "#2563eb"],
-                ["Resolved", stats.resolved, "#16a34a"],
-                ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#1d3557"],
-              ].map(([label, value, color]) => (
-                <div key={label as string}>
-                  <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
-                  <dt className="text-[11px] text-slate-500">{label}</dt>
-                </div>
-              ))}
-            </dl>
+            {statCells(false)}
             {error && <p role="alert" className="m-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Could not refresh the map. Showing the last results.</p>}
             <ul className="space-y-2 overflow-y-auto p-3">
               {reports.length === 0 && !loading && <li className="p-6 text-center text-sm text-slate-500">No reports match these filters yet.</li>}

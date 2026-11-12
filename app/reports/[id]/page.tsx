@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import ProgressSteps from "@/components/ProgressSteps";
+import LocationCard from "@/components/LocationCard";
+import ShareReport from "@/components/ShareReport";
+import PhotoGallery from "@/components/PhotoGallery";
 import StaticMap from "@/components/StaticMap";
 import StatusBadge from "@/components/StatusBadge";
 import TransitionControls from "@/components/TransitionControls";
@@ -72,22 +75,7 @@ export default async function ReportPage({ params }: Props) {
           <section className="card p-5">
             <h2 className="text-lg font-semibold">Details</h2>
             <p className="mt-2 whitespace-pre-line text-slate-700">{report.description}</p>
-            {report.media.length > 0 && (
-              <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {report.media.map((m) => (
-                  <li key={m.id}>
-                    <a href={m.url} target="_blank" rel="noopener noreferrer">
-                      {m.url.endsWith(".pdf") ? (
-                        <span className="grid aspect-square w-full place-items-center rounded-lg bg-slate-100 text-sm font-semibold text-ink-700">Open PDF</span>
-                      ) : (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={m.url} alt="Photo of the reported issue" className="aspect-square w-full rounded-lg object-cover" />
-                      )}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
+            {report.media.length > 0 && <PhotoGallery photos={report.media} />}
           </section>
 
           <section className="card p-5">
@@ -114,6 +102,8 @@ export default async function ReportPage({ params }: Props) {
 
         <aside className="space-y-6">
           <StaticMap lng={report.lng} lat={report.lat} status={report.status} />
+          <LocationCard lat={report.lat} lng={report.lng} address={report.address} />
+          <ShareReport title={report.title} />
 
           {isStaffRole(session?.role) && report.allowedTransitions && (
             <section className="card space-y-3 p-5">
