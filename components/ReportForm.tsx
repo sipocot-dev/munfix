@@ -11,6 +11,24 @@ import LocationPicker, { type LngLat } from "./LocationPicker";
 const MAX_FILES = 3;
 const MAX_BYTES = 5 * 1024 * 1024;
 
+/** Hosting caps a whole request near 4.5 MB, so large photos are scaled down before upload (PDFs go as they are). */
+async function shrink(file: File): Promise<File> {
+  if (!file.type.startsWith("image/") || file.size < 1024 * 1024) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  return blob ? new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+}
+
 export default function ReportForm({
   categories,
   problemTypes,
@@ -31,8 +49,8 @@ export default function ReportForm({
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
-  function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(e.target.files ?? []);
+  async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = await Promise.all(Array.from(e.target.files ?? []).map(shrink));
     e.target.value = "";
     const next = [...files, ...picked].slice(0, MAX_FILES);
     if (files.length + picked.length > MAX_FILES) setError(`You can attach up to ${MAX_FILES} photos.`);
