@@ -34,8 +34,11 @@ function pinElement(r: ReportSummary): HTMLButtonElement {
   // so a map of hundreds of pins does not request every thumbnail up front.
   let card: HTMLElement | null = null;
   const show = (on: boolean) => () => {
+    // A selected pin already has its popup open, so a second card would stack on top of it.
+    if (on && el.dataset.selected) return;
     if (on && !card) {
       card = popupNode(r);
+      card.dataset.hoverCard = "";
       card.style.cssText = "position:absolute;left:50%;transform:translateX(-50%);width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
       el.append(card);
     }
@@ -229,6 +232,9 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
     markersRef.current.forEach((m, id) => {
       (m.el.firstElementChild as HTMLElement).style.transform = id === selectedId ? "scale(1.25)" : "";
       m.el.style.zIndex = id === selectedId ? "5" : "";
+      m.el.dataset.selected = id === selectedId ? "1" : "";
+      const hover = m.el.querySelector<HTMLElement>("[data-hover-card]");
+      if (hover && id === selectedId) hover.style.display = "none";
     });
 
     if (popupRef.current) {
