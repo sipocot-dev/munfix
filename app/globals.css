@@ -136,10 +136,42 @@ body {
 .pin-card {
   animation: card-in 0.18s ease-out;
 }
+/* Click: the pin lifts off, a shock ring spreads, and the other pins fade while the map flies in. */
+@keyframes pin-launch {
+  0% { transform: translateY(0) scale(1); }
+  30% { transform: translateY(-10px) scale(1.2); }
+  100% { transform: translateY(-140px) scale(0.35); opacity: 0; }
+}
+@keyframes pin-shock {
+  from { transform: scale(0.5); opacity: 1; }
+  to { transform: scale(7); opacity: 0; }
+}
+.pin.pin-launch .pin-svg {
+  animation: pin-launch 0.9s cubic-bezier(0.5, 0, 0.8, 0.4) forwards;
+}
+.pin.pin-launch::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 34px;
+  height: 12px;
+  border: 2px solid rgb(29 53 87 / 0.7);
+  border-radius: 50%;
+  animation: pin-shock 0.9s ease-out forwards;
+}
+.pin.pin-launch .pin-card {
+  display: none !important; /* beats the inline display set on hover */
+}
+.map-launching .pin:not(.pin-launch) {
+  opacity: 0.25;
+  transition: opacity 0.4s ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
   .pin-svg,
   .pin-card,
-  .pin[data-selected="1"]::before {
+  .pin[data-selected="1"]::before,
+  .pin.pin-launch::after {
     animation: none;
     transition: none;
   }

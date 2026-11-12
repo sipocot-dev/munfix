@@ -7,6 +7,7 @@ import { glyphFor } from "@/lib/categoryIcons";
 import { createMap } from "@/lib/map";
 import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL } from "@/lib/status";
 import { withinBounds } from "@/lib/config";
+import { useRouter } from "next/navigation";
 
 interface Props {
   reports: ReportSummary[];
@@ -17,6 +18,19 @@ interface Props {
 }
 
 const TERRAIN_SOURCE = "terrain-dem";
+const LAUNCH_MS = 950;
+
+/** Clicking a pin: the pin lifts off, the map flies in, then the report page opens. */
+function launchReport(map: MlMap, router: { push: (href: string) => void }, r: ReportSummary, node: HTMLElement) {
+  if (node.dataset.launching) return;
+  node.dataset.launching = "1";
+  const href = `/reports/${r.id}`;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return router.push(href);
+  node.classList.add("pin-launch");
+  map.getContainer().classList.add("map-launching");
+  map.easeTo({ center: [r.lng, r.lat], zoom: Math.max(map.getZoom(), 16.5), pitch: 60, duration: LAUNCH_MS, essential: true });
+  setTimeout(() => router.push(href), LAUNCH_MS);
+}
 
 function pinElement(r: ReportSummary, delay: number): HTMLButtonElement {
   const color = STATUS_COLOR[r.status];
@@ -42,15 +56,12 @@ function pinElement(r: ReportSummary, delay: number): HTMLButtonElement {
       card = popupNode(r);
       card.dataset.hoverCard = "";
       card.className = "pin-card";
-      card.style.cssText = "position:absolute;left:50%;transform:translateX(-50%);width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
+      card.style.cssText = "position:absolute;left:50%;bottom:100%;margin:0 0 8px;transform:translateX(-50%);width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
       el.append(card);
     }
     if (!card) return;
-    // Near the top edge of the map there is no room above the pin, so open the card below it.
-    const below = on && el.getBoundingClientRect().top < 260;
-    card.style.top = below ? "100%" : "";
-    card.style.bottom = below ? "" : "100%";
-    card.style.margin = below ? "8px 0 0" : "0 0 8px";
+    // The card always sits above the pin and lifts over neighbouring pins while hovered.
+    el.style.zIndex = on ? "6" : el.dataset.selected ? "5" : "";
     card.style.display = on ? "block" : "none";
   };
   el.addEventListener("mouseenter", show(true));
@@ -90,12 +101,7 @@ function popupNode(r: ReportSummary): HTMLElement {
   meta.textContent = [r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ");
   meta.style.cssText = "font-size:12px;color:#64748b;margin-bottom:6px";
 
-  const link = document.createElement("a");
-  link.href = `/reports/${r.id}`;
-  link.textContent = "View details →";
-  link.style.cssText = "font-size:13px;font-weight:600;color:#1d3557";
-
-  root.append(status, title, meta, link);
+  root.append(status, title, meta);
   return root;
 }
 
@@ -109,6 +115,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
   const markersRef = useRef<Map<string, { marker: MlMarker; el: HTMLElement }>>(new Map());
   const reportsRef = useRef(reports);
   const onSelectRef = useRef(onSelect);
+  const router = useRouter();
   const [ready, setReady] = useState(false);
   const [tileErrors, setTileErrors] = useState(0);
   const [visible, setVisible] = useState(reports.length);
@@ -121,6 +128,8 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
 
   reportsRef.current = reports;
   onSelectRef.current = onSelect;
+  const routerRef = useRef(router);
+  routerRef.current = router;
 
   const countVisible = useCallback(() => {
     const map = mapRef.current;
@@ -222,7 +231,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
         const node = pinElement(r, Math.min(added++, 25) * 40);
         node.addEventListener("click", (e) => {
           e.stopPropagation();
-          onSelectRef.current(r.id);
+          launchReport(map, routerRef.current, r, node);
         });
         const marker = new Marker({ element: node, anchor: "bottom" }).setLngLat([r.lng, r.lat]).addTo(map);
         markers.set(r.id, { marker, el: node });
