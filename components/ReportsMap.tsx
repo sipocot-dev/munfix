@@ -24,7 +24,8 @@ function pinElement(r: ReportSummary): HTMLButtonElement {
   el.type = "button";
   el.setAttribute("aria-label", `${r.title}, ${STATUS_LABEL[r.status]}`);
   // No transition here: MapLibre positions this element with transform, so animating it makes pins wobble.
-  el.style.cssText = "all:unset;cursor:pointer;display:block;width:34px;height:44px";
+  // Keep position:absolute here. `all:unset` would reset it to static, and MapLibre then drifts every pin on zoom.
+  el.style.cssText = "position:absolute;top:0;left:0;margin:0;padding:0;border:0;background:none;cursor:pointer;display:block;width:34px;height:44px";
   el.innerHTML = `<svg viewBox="0 0 34 44" width="34" height="44" style="display:block;transform-origin:50% 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))" aria-hidden="true">
     <path d="M17 43C17 43 2 28 2 16a15 15 0 0 1 30 0c0 12-15 27-15 27Z" fill="${color}" stroke="#fff" stroke-width="2"/>
     <circle cx="17" cy="16" r="10" fill="#fff"/>
