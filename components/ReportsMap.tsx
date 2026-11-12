@@ -18,15 +18,17 @@ interface Props {
 
 const TERRAIN_SOURCE = "terrain-dem";
 
-function pinElement(r: ReportSummary): HTMLButtonElement {
+function pinElement(r: ReportSummary, delay: number): HTMLButtonElement {
   const color = STATUS_COLOR[r.status];
   const el = document.createElement("button");
   el.type = "button";
+  el.className = "pin";
   el.setAttribute("aria-label", `${r.title}, ${STATUS_LABEL[r.status]}`);
   // No transition here: MapLibre positions this element with transform, so animating it makes pins wobble.
   // Keep position:absolute here. `all:unset` would reset it to static, and MapLibre then drifts every pin on zoom.
   el.style.cssText = "position:absolute;top:0;left:0;margin:0;padding:0;border:0;background:none;cursor:pointer;display:block;width:34px;height:44px";
-  el.innerHTML = `<svg viewBox="0 0 34 44" width="34" height="44" style="display:block;transform-origin:50% 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))" aria-hidden="true">
+  // Motion lives on the inner svg and the pseudo-elements in globals.css: MapLibre owns the marker root's transform.
+  el.innerHTML = `<svg class="pin-svg" viewBox="0 0 34 44" width="34" height="44" style="display:block;transform-origin:50% 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));animation-delay:${delay}ms" aria-hidden="true">
     <path d="M17 43C17 43 2 28 2 16a15 15 0 0 1 30 0c0 12-15 27-15 27Z" fill="${color}" stroke="#fff" stroke-width="2"/>
     <circle cx="17" cy="16" r="10" fill="#fff"/>
     <text x="17" y="21" text-anchor="middle" font-size="13">${glyphFor(r.categorySlug)}</text></svg>`;
@@ -39,6 +41,7 @@ function pinElement(r: ReportSummary): HTMLButtonElement {
     if (on && !card) {
       card = popupNode(r);
       card.dataset.hoverCard = "";
+      card.className = "pin-card";
       card.style.cssText = "position:absolute;left:50%;transform:translateX(-50%);width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
       el.append(card);
     }
@@ -61,12 +64,18 @@ function popupNode(r: ReportSummary): HTMLElement {
   const root = document.createElement("div");
   root.style.maxWidth = "230px";
 
+  // Same layout for every pin: photo on top, text below. Reports without a photo get a tinted placeholder.
   if (r.thumb) {
     const img = document.createElement("img");
     img.src = r.thumb;
     img.alt = "";
     img.style.cssText = "width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:6px";
     root.append(img);
+  } else {
+    const ph = document.createElement("div");
+    ph.textContent = glyphFor(r.categorySlug);
+    ph.style.cssText = `height:110px;display:grid;place-items:center;font-size:32px;border-radius:8px;margin-bottom:6px;background:${STATUS_COLOR[r.status]}1f`;
+    root.append(ph);
   }
 
   const status = document.createElement("div");
@@ -207,9 +216,10 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
           markers.delete(id);
         }
       }
+      let added = 0;
       for (const r of reports) {
         if (markers.has(r.id)) continue;
-        const node = pinElement(r);
+        const node = pinElement(r, Math.min(added++, 25) * 40);
         node.addEventListener("click", (e) => {
           e.stopPropagation();
           onSelectRef.current(r.id);
@@ -230,7 +240,6 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
     if (!ready || !map) return;
 
     markersRef.current.forEach((m, id) => {
-      (m.el.firstElementChild as HTMLElement).style.transform = id === selectedId ? "scale(1.25)" : "";
       m.el.style.zIndex = id === selectedId ? "5" : "";
       m.el.dataset.selected = id === selectedId ? "1" : "";
       const hover = m.el.querySelector<HTMLElement>("[data-hover-card]");

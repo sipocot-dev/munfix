@@ -96,3 +96,51 @@ body {
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;
 }
+
+/* Map pins. Motion goes on the inner svg and pseudo-elements only: MapLibre sets transform on the marker root. */
+@keyframes pin-drop {
+  0% { opacity: 0; transform: translateY(-16px) scale(0.6); }
+  60% { opacity: 1; transform: translateY(3px) scale(1.04); }
+  100% { transform: none; }
+}
+@keyframes pin-pulse {
+  0% { opacity: 0.7; transform: scale(0.4); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+.pin-svg {
+  animation: pin-drop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: transform 0.2s ease-out;
+}
+.pin:hover .pin-svg {
+  transform: translateY(-3px);
+}
+.pin[data-selected="1"] .pin-svg {
+  transform: scale(1.25);
+}
+.pin[data-selected="1"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 34px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgb(29 53 87 / 0.45);
+  z-index: -1;
+  animation: pin-pulse 1.6s ease-out infinite;
+}
+.pin-card {
+  animation: card-in 0.18s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin-svg,
+  .pin-card,
+  .pin[data-selected="1"]::before {
+    animation: none;
+    transition: none;
+  }
+}

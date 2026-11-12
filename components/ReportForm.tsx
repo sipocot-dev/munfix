@@ -66,6 +66,7 @@ export default function ReportForm({
     setError(null);
     if (!location) return setError("Click the map to mark where the problem is.");
     if (!withinBounds(location.lng, location.lat)) return setError(`The pin must be inside ${MUNICIPALITY.name}.`);
+    if (files.length === 0) return setError("Attach at least one photo of the problem.");
 
     const form = new FormData(e.currentTarget);
     form.set("lat", String(location.lat));
@@ -173,7 +174,7 @@ export default function ReportForm({
 
       <section className="card space-y-3 p-5">
         <h2 className="text-lg font-semibold">
-          Photos <span className="text-sm font-normal text-slate-500">(optional, up to {MAX_FILES})</span>
+          Photos <span className="text-sm font-normal text-slate-500">(at least one, up to {MAX_FILES})</span>
         </h2>
         <p className="text-sm text-slate-600">Clear photos help city crews find and assess the problem. JPEG, PNG or WebP, up to 5 MB each.</p>
         {previews.length > 0 && (

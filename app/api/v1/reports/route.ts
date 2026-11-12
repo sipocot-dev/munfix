@@ -27,8 +27,7 @@ export const GET = route(async (req) => {
 });
 
 /**
- * Authenticated: submit a report. Accepts multipart/form-data (fields plus up
- * to 3 `photos` files) or plain JSON when there are no photos.
+ * Authenticated: submit a report as multipart/form-data with 1 to 3 `photos` files.
  */
 export const POST = route(async (req) => {
   const session = await requireUser();
@@ -54,6 +53,7 @@ export const POST = route(async (req) => {
   if (!withinBounds(input.lng, input.lat)) {
     throw new HttpError(400, "The selected location is outside Sipocot");
   }
+  if (files.length === 0) throw new HttpError(400, "Attach at least one photo of the problem");
 
   const stored = await saveImages(files);
   try {
