@@ -152,17 +152,18 @@ It is additive. It was checked on a fresh database (CI) and on a database with e
 | `npm run test:e2e`, run locally (Chromium: setup, desktop, tablet, mobile; production build; PostgreSQL 17; a local Redis stand-in) | **199 passed, 5 skipped**: the 4 email tests (no Mailpit locally, see below) and the keyboard-only cluster test on the phone profile. The later map fix was re-run on desktop, phone and small phone: 24 passed |
 | Accessibility (axe-core, WCAG 2.2 AA tags), part of the run above | 16 pages × light and dark × desktop and phone: **0 violations** |
 | Lint | No linter is configured in this repository; not run |
-| CI (`check` and `e2e` jobs, including Firefox, WebKit and Mailpit) | See the pull request's checks |
+| CI `check` job | Typecheck, unit tests, production audit and build all pass |
+| CI `e2e` job (Postgres 16, Redis 7, Mailpit; Chromium desktop, tablet, phone and small phone, WebKit/iPhone 14, Firefox) | **273 passed, 3 skipped, 0 failed**. The email tests pass against Mailpit. Firefox and WebKit pass every map-marker test. The 3 skips are the keyboard-only cluster test on touch profiles, by design |
 
 **New tests:**
 
 - **Unit:** escalation guards and role management (`roles.test.ts`); the built-in role matrix (`permissions.test.ts`); the publication state machine (`status.test.ts`); auto-publish, hiding, disabled roles and temporary passwords (`report-access.test.ts`); dark and light token contrast and the marker CSS invariant (`design-system.test.ts`); cluster labels and sizes; test-account guards.
 - **End-to-end:** `public`, `map`, `auth`, `citizen`, `moderation`, `admin`, `authorization`, `email` and `a11y` specs.
 
-**Not verified here:**
+**Where things were verified:**
 
-- **Email.** Mailpit could not run in this environment: there is no Docker, and running its downloaded binary was not permitted. The email tests run only in CI, against a Mailpit service container.
-- **Firefox and WebKit.** Their system libraries are missing here, so they run only in CI. If a CI browser has no WebGL, the map tests skip with that reason rather than fail.
+- **Email** was verified in CI only. Mailpit could not run in this development environment: there is no Docker, and running its downloaded binary was not permitted. CI runs it as a service container, and all 4 email tests pass there.
+- **Firefox and WebKit** run in CI only. Firefox runs headed under `xvfb` because headless Firefox has no WebGL on a GPU-less runner; the first CI runs showed its map tests skipping for that reason, so this was changed. If a browser still has no WebGL, the map tests skip and say why.
 
 ## 7. Known limitations and outstanding work
 
@@ -175,7 +176,7 @@ It is additive. It was checked on a fresh database (CI) and on a database with e
 | Theme preference | Stored per browser, not per account. Without JavaScript the light theme is used whatever the OS preference |
 | Auto-publication | Inappropriate content is public until a moderator acts; consider image screening or a per-category "review first" option if abuse appears |
 | OpenFreeMap | No SLA; the documented fallbacks are self-hosting or a keyed provider |
-| CI duration | The e2e job took about 8.5 minutes on its first run; tests run serially (`workers: 1`) because they share one database |
+| CI duration | The e2e job takes about 7.5 minutes; tests run serially (`workers: 1`) because they share one database |
 | Vitest advisories (dev only) | Upgrade to Vitest 4.1.12 or later in a separate PR |
 
 ## 8. Rollout

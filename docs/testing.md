@@ -65,6 +65,6 @@ Playwright keeps a trace and a screenshot for failed tests in `test-results/`. O
 `.github/workflows/ci.yml` has two jobs on every pull request:
 
 - **check**: typecheck, unit tests, production dependency audit, build.
-- **e2e**: Postgres 16, Redis 7 and Mailpit service containers; build; migrate; seed; all Playwright projects including Firefox and WebKit.
+- **e2e**: Postgres 16, Redis 7 and Mailpit service containers; build; migrate; seed; the Chromium and WebKit projects; then the Firefox project, headed under `xvfb-run` (headless Firefox has no WebGL on a GPU-less runner, and the map needs it).
 
 There is no linter configured in this repository (no ESLint config), so there is no lint step.
