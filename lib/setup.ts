@@ -77,6 +77,11 @@ export async function runMigrations(client: PoolClient, log: Log = console.log):
 async function seedDemoAccounts(client: PoolClient, log: Log): Promise<void> {
   if (process.env.SEED_DEMO_ACCOUNTS !== "true") return;
   const password = process.env.DEMO_PASSWORD || "demo-password";
+  // The default is public (it is in this repository), and one of these logins is a moderator.
+  if (process.env.NODE_ENV === "production" && !isStrongBootstrapPassword(password)) {
+    console.error("Refusing to create demo accounts: in production DEMO_PASSWORD must be 12+ characters and not a default.");
+    return;
+  }
   const hash = await hashPassword(password);
   const accounts: [string, string, string][] = [
     ["demo.citizen@munfix.local", "Demo Citizen", "citizen"],

@@ -25,7 +25,8 @@ export default function Explorer({
 }: {
   initialReports: ReportSummary[];
   categories: Category[];
-  stats: Stats;
+  /** null when the numbers could not be loaded. */
+  stats: Stats | null;
 }) {
   const [reports, setReports] = useState(initialReports.filter((r) => DEFAULT_STATUSES.includes(r.status)));
   const [statuses, setStatuses] = useState<Status[]>([...DEFAULT_STATUSES]);
@@ -95,14 +96,15 @@ export default function Explorer({
   const statCells = (floating: boolean) => (
     <dl className={floating ? "hidden grid-cols-4 gap-3 rounded-xl bg-white p-3 text-center shadow-lg ring-1 ring-black/5 sm:grid" : "grid grid-cols-4 gap-2 border-b border-slate-100 p-3 text-center"}>
       {[
-        ["Verified", stats.verified, "#d97706"],
-        ["In progress", stats.inProgress, "#2563eb"],
-        ["Resolved", stats.resolved, "#16a34a"],
-        ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#1d3557"],
+        ["Verified", stats?.verified ?? "—", "#d97706"],
+        ["In progress", stats?.inProgress ?? "—", "#2563eb"],
+        ["Resolved", stats?.resolved ?? "—", "#16a34a"],
+        ["Avg. fix", stats?.avgResolutionDays == null ? "—" : `${stats.avgResolutionDays}d`, "#1d3557"],
       ].map(([label, value, color]) => (
-        <div key={label as string}>
-          <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
+        // dt before dd (valid list markup); column-reverse keeps the number on top.
+        <div key={label as string} className="flex flex-col-reverse">
           <dt className="text-[11px] text-slate-500">{label}</dt>
+          <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
         </div>
       ))}
     </dl>

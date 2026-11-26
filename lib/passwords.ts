@@ -31,6 +31,7 @@ const COMMON = new Set([
   "letmein1",
   "welcome1",
   "change-me-please",
+  "demo-password",
   "changeme",
 ]);
 

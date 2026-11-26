@@ -10,6 +10,8 @@ import LocationPicker, { type LngLat } from "./LocationPicker";
 
 const MAX_FILES = 3;
 const MAX_BYTES = 5 * 1024 * 1024;
+/** The whole request must stay under the host's ~4.5 MB body limit, or it is refused before reaching the app. */
+const MAX_TOTAL_BYTES = 4 * 1024 * 1024;
 
 /** Hosting caps a whole request near 4.5 MB, so large photos are scaled down before upload (PDFs go as they are). */
 async function shrink(file: File): Promise<File> {
@@ -50,12 +52,16 @@ export default function ReportForm({
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
 
   async function onFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const picked = await Promise.all(Array.from(e.target.files ?? []).map(shrink));
+    // A photo the browser cannot decode (e.g. HEIC on some browsers) goes as it is; the server checks the type.
+    const picked = await Promise.all(Array.from(e.target.files ?? []).map((f) => shrink(f).catch(() => f)));
     e.target.value = "";
     const next = [...files, ...picked].slice(0, MAX_FILES);
     if (files.length + picked.length > MAX_FILES) setError(`You can attach up to ${MAX_FILES} photos.`);
     else if (picked.some((f) => f.size > MAX_BYTES)) {
       setError("Each photo must be 5 MB or smaller.");
+      return;
+    } else if (next.reduce((sum, f) => sum + f.size, 0) > MAX_TOTAL_BYTES) {
+      setError("Your attachments are too large together (4 MB at most). Remove a file or attach a smaller one.");
       return;
     } else setError(null);
     setFiles(next);
@@ -83,7 +89,7 @@ export default function ReportForm({
         return;
       }
       if (!res.ok) {
-        setError(apiError(data));
+        setError(res.status === 413 ? "Your photos are too large to send. Remove one or use smaller photos." : apiError(data));
         return;
       }
       router.push(`/reports/${data.id}`);
@@ -204,6 +210,7 @@ export default function ReportForm({
             type="file"
             accept="image/jpeg,image/png,image/webp,application/pdf"
             multiple
+            aria-label="Add photos"
             onChange={onFiles}
             className="block text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-slate-100 file:px-3 file:py-2 file:font-semibold hover:file:bg-slate-200"
           />

@@ -14,7 +14,8 @@ export default async function HomePage() {
   };
   const [reports, stats, categories] = await Promise.all([
     listPublicReports({ limit: 500 }).catch(fail("reports", [] as Awaited<ReturnType<typeof listPublicReports>>)),
-    getStats().catch(fail("stats", { verified: 0, inProgress: 0, resolved: 0, avgResolutionDays: null })),
+    // null, not zeros: a failed load must not look like "nothing reported".
+    getStats().catch(fail("stats", null)),
     listCategories().catch(fail("categories", [] as Awaited<ReturnType<typeof listCategories>>)),
   ]);
 

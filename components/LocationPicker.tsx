@@ -108,10 +108,22 @@ export default function LocationPicker({ value, onChange }: { value: LngLat | nu
 
   return (
     <div>
-      <div ref={el} className="h-80 w-full overflow-hidden rounded-xl border border-slate-300" />
+      <div ref={el} role="region" aria-label="Map for choosing the problem location" className="h-80 w-full overflow-hidden rounded-xl border border-slate-300" />
       <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
         <button type="button" onClick={useMyLocation} disabled={locating} className="btn btn-secondary !py-1.5">
           {locating ? "Locating…" : "Use my location"}
+        </button>
+        {/* Keyboard and screen-reader users cannot click the map: pan it with the arrow keys, then drop the pin here. */}
+        <button
+          type="button"
+          disabled={!ready}
+          onClick={() => {
+            const c = mapRef.current?.getCenter();
+            if (c) onChangeRef.current({ lng: c.lng, lat: c.lat });
+          }}
+          className="btn btn-secondary !py-1.5"
+        >
+          Pin map centre
         </button>
         <span className="text-slate-600">
           {value ? `Pin at ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)} — drag to adjust` : "Click the map to drop a pin on the problem"}

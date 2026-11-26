@@ -6,7 +6,17 @@ export function apiError(data: unknown, fallback = "Something went wrong. Please
   return d.error ?? fallback;
 }
 
-/** Only allow same-site relative redirects after login. */
+/**
+ * Only allow same-site relative redirects after login. Parsed the way a browser would, because
+ * "/\evil.com" and "/<tab>/evil.com" pass a plain prefix check but resolve to another host.
+ */
 export function safeNext(value: string | null | undefined): string {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+  if (!value || !value.startsWith("/")) return "/";
+  const base = "http://munfix.invalid";
+  try {
+    const url = new URL(value, base);
+    return url.origin === base ? url.pathname + url.search + url.hash : "/";
+  } catch {
+    return "/";
+  }
 }

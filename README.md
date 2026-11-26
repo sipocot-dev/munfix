@@ -45,7 +45,18 @@ npm run dev                # http://localhost:3000
 ```
 
 Default admin (from `.env`): `admin@munfix.local` / `change-me-please`. **Change `SEED_ADMIN_PASSWORD` before deploying.**
-Demo citizen (only with `SEED_DEMO=true`): `demo.citizen@munfix.local` / `demo-password`.
+`SEED_DEMO=true` adds sample reports only. Demo logins for each role (`demo.citizen@munfix.local`, `demo.moderator@…`, `demo.staff@…`) need `SEED_DEMO_ACCOUNTS=true`; their password is `DEMO_PASSWORD` (default `demo-password`, refused in production).
+
+### Tests and checks
+
+```bash
+npm run typecheck
+npm test                    # unit tests (Vitest); no database or Redis needed
+npm audit --omit=dev --audit-level=high
+npm run build
+```
+
+CI runs the same four on every pull request. The tests mock Postgres and Redis; see `tests/unit/report-access.test.ts` for the role and ownership matrix.
 
 Run everything in containers instead:
 
@@ -79,16 +90,21 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 | Variable | Purpose |
 | --- | --- |
 | `DATABASE_URL`, `REDIS_URL` | Service connections |
+| `DATABASE_SCHEMA` | Postgres schema for MunFix's tables (default `munfix`) |
+| `CRON_SECRET` | Bearer secret for `/api/cron/mail` (Vercel Cron). Unset = endpoint closed |
 | `AUTO_SETUP` | `true` (default) migrates and seeds on startup; `false` to do it manually |
 | `APP_URL` | Public URL; `https://` marks session cookies `Secure` |
 | `STORAGE_DRIVER` | `local` (default) or `s3` |
 | `UPLOAD_DIR` | Photo directory for the `local` driver (use a persistent volume) |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PREFIX` | `s3` driver settings. R2: `S3_REGION=auto` and its account endpoint. MinIO: `S3_FORCE_PATH_STYLE=true` |
+| `AWS_ROLE_ARN` | `s3` on Vercel with the AWS integration: OIDC role instead of static keys |
+| `SEED_DEMO_ACCOUNTS`, `DEMO_PASSWORD` | Demo logins per role; in production only with a strong `DEMO_PASSWORD` |
 | `SMTP_URL` or `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`, `MAIL_FROM` | Email notifications (see below). Unset = email disabled |
 | `OAUTH_GOOGLE_*`, `OAUTH_FACEBOOK_*` | `CLIENT_ID` / `CLIENT_SECRET` for social sign-in (see below) |
 | `NEXT_PUBLIC_MAP_CENTER_*` | Initial map center (Sipocot by default) |
 | `NEXT_PUBLIC_MAP_BOUNDS` | `minLng,minLat,maxLng,maxLat` — reports must be pinned inside this box |
 | `NEXT_PUBLIC_MAP_TILE_URL` | Tile template. The public OSM server is for development only; use a tile provider in production |
+| `NEXT_PUBLIC_MAP_STYLE` | `vector` for the OpenFreeMap vector style on the explorer |
 
 The municipality is configuration, not code: change the name, province, center and bounds to deploy for another city.
 
@@ -210,8 +226,15 @@ scripts/             migrate.ts, seed.ts and mail-test.ts
 instrumentation.ts    Starts the email retry worker with the server
 ```
 
+## Further documentation
+
+- [docs/architecture.md](docs/architecture.md): components, trust boundaries, data flow
+- [docs/security.md](docs/security.md): sessions, passwords, rate limits, headers, known limitations
+- [docs/operations.md](docs/operations.md): deploy and rollback, migrations, backups and restore, incidents
+- [docs/claude-audit-report.md](docs/claude-audit-report.md): November 2026 full-stack audit
+
 ## Notes
 
-- Rate limits (Redis): 5 sign-ups/hour/IP, login attempts per IP and per email, 10 reports/hour/user.
+- Rate limits (Redis): 5 sign-ups/hour/IP, login attempts per IP and per email, 10 reports/hour/user, 20 feedback/follow-up entries/hour/user.
 - The barangay field suggests the 46 barangays of Sipocot but accepts any text.
 - Photos default to local disk. Running more than one app instance? Use `STORAGE_DRIVER=s3`. Existing local photos are not migrated automatically; copy the files in `UPLOAD_DIR` into the bucket under the same names.

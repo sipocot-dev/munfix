@@ -30,6 +30,11 @@ jobs:
           # Plain SQL, compressed; --no-owner keeps restores portable. Only the app schema is dumped.
           pg_dump "$DATABASE_URL" --schema=munfix --no-owner --no-privileges | gzip -9 > "$FILE"
           test -s "$FILE"
+          # Integrity: the archive must decompress and the dump must have finished (pg_dump writes this last).
+          gzip -t "$FILE"
+          gunzip -c "$FILE" | tail -n 5 | grep -q "PostgreSQL database dump complete"
+          # grep -c reads to the end; -q would stop early and SIGPIPE gunzip under pipefail.
+          gunzip -c "$FILE" | grep -c "CREATE TABLE munfix.schema_migrations" >/dev/null
           EXTRA=""; [ -n "$ENDPOINT" ] && EXTRA="--endpoint-url $ENDPOINT"
           aws s3 cp "$FILE" "s3://$BUCKET/backups/$FILE" $EXTRA
           echo "Uploaded $FILE ($(stat -c %s "$FILE") bytes)"

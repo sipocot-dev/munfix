@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { query } from "@/lib/db";
 import { drainOutbox } from "@/lib/notifications";
@@ -11,7 +12,8 @@ export const maxDuration = 60;
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
-  if (!secret || req.headers.get("authorization") !== `Bearer ${secret}`) {
+  const digest = (v: string) => createHash("sha256").update(v).digest();
+  if (!secret || !timingSafeEqual(digest(req.headers.get("authorization") ?? ""), digest(`Bearer ${secret}`))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const sent = await drainOutbox();

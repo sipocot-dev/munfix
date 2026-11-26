@@ -22,7 +22,8 @@ export const GET = route<Ctx>(async (_req, { params }) => {
       "Content-Type": CONTENT_TYPES[name.split(".").pop() ?? ""] ?? "application/octet-stream",
       "Content-Length": String(data.length),
       "X-Content-Type-Options": "nosniff",
-      "Cache-Control": access.isPublic ? "public, max-age=86400, immutable" : "private, no-store",
+      // Short public lifetime: a published report can still be rejected, and its photos must not linger in shared caches.
+      "Cache-Control": access.isPublic ? "public, max-age=300" : "private, no-store",
     },
   });
 });
