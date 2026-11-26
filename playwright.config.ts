@@ -36,7 +36,17 @@ export default defineConfig({
     { name: "mobile-small", dependencies: ["setup"], grep: /@responsive/, use: { ...devices["Pixel 7"], viewport: { width: 375, height: 667 } } },
     ...(allBrowsers
       ? [
-          { name: "firefox", dependencies: ["setup"], grep: /@cross-browser/, use: { ...devices["Desktop Firefox"], viewport: { width: 1280, height: 800 } } },
+          {
+            name: "firefox",
+            dependencies: ["setup"],
+            grep: /@cross-browser/,
+            use: {
+              ...devices["Desktop Firefox"],
+              viewport: { width: 1280, height: 800 },
+              // Headless Firefox on CI has no GPU and turns WebGL off; force software rendering so the map draws.
+              launchOptions: { firefoxUserPrefs: { "webgl.force-enabled": true, "webgl.disabled": false } },
+            },
+          },
           { name: "webkit-mobile", dependencies: ["setup"], grep: /@cross-browser/, use: { ...devices["iPhone 14"] } },
         ]
       : []),
