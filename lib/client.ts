@@ -20,3 +20,9 @@ export function safeNext(value: string | null | undefined): string {
     return "/";
   }
 }
+
+/** A report id from a bare UUID or a pasted report URL (…/reports/<uuid>), for the "mark duplicate" form. */
+export function extractId(value: string): string {
+  const m = value.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return m ? m[0].toLowerCase() : value.trim();
+}

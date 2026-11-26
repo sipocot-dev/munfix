@@ -1,124 +1,166 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { Map as MlMap, Marker as MlMarker, Popup as MlPopup } from "maplibre-gl";
-import type { Category, ReportSummary } from "@/lib/reports";
-import { glyphFor } from "@/lib/categoryIcons";
-import { createMap } from "@/lib/map";
-import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL } from "@/lib/status";
-import { withinBounds } from "@/lib/config";
+import { useEffect, useRef, useState } from "react";
+import type { GeoJSONSource, Map as MlMap, Marker as MlMarker, Popup as MlPopup } from "maplibre-gl";
 import { useRouter } from "next/navigation";
+import type { Category, ReportSummary } from "@/lib/reports";
+import { iconPathFor } from "@/lib/categoryIcons";
+import { withinBounds } from "@/lib/config";
+import { formatDate } from "@/lib/format";
+import { createMap } from "@/lib/map";
+import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL, STATUS_TEXT } from "@/lib/status";
+import Icon from "./ui/Icon";
+import { CategoryIcon } from "./ui/Icon";
 
 interface Props {
   reports: ReportSummary[];
   categories: Category[];
   selectedId: string | null;
+  /** Report hovered in the list: its pin is raised so the two are visibly linked. */
+  highlightId?: string | null;
   onSelect: (id: string | null) => void;
+  /** Ids of the reports inside the current view, after every move. */
+  onViewChange?: (ids: Set<string>) => void;
   className?: string;
 }
 
+const SOURCE = "reports";
 const TERRAIN_SOURCE = "terrain-dem";
-const LAUNCH_MS = 950;
+/** Above this zoom every report is its own pin. */
+const CLUSTER_MAX_ZOOM = 14;
 
-/** Clicking a pin: the pin lifts off, the map flies in, then the report page opens. */
-function launchReport(map: MlMap, router: { push: (href: string) => void }, r: ReportSummary, node: HTMLElement) {
-  if (node.dataset.launching) return;
-  node.dataset.launching = "1";
-  const href = `/reports/${r.id}`;
-  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return router.push(href);
-  node.classList.add("pin-launch");
-  map.getContainer().classList.add("map-launching");
-  map.easeTo({ center: [r.lng, r.lat], zoom: Math.max(map.getZoom(), 16.5), pitch: 60, duration: LAUNCH_MS, essential: true });
-  setTimeout(() => router.push(href), LAUNCH_MS);
+/* ----------------------------- DOM builders (MapLibre markers live outside React) ----------------------------- */
+
+export function pinSvg(r: Pick<ReportSummary, "status" | "categorySlug">): string {
+  // Category icon (24px grid) scaled into the pin's white disc; fill = status colour.
+  return `<svg class="pin-svg" viewBox="0 0 32 42" width="32" height="42" style="display:block;transform-origin:50% 100%;filter:drop-shadow(0 1px 2px rgba(15,23,42,.35))" aria-hidden="true" focusable="false">
+    <path d="M16 41S2 27 2 15a14 14 0 0 1 28 0c0 12-14 26-14 26Z" fill="${STATUS_COLOR[r.status]}" stroke="#fff" stroke-width="2"/>
+    <circle cx="16" cy="15" r="9.5" fill="#fff"/>
+    <g transform="translate(9.5 8.5) scale(.54)" fill="none" stroke="${STATUS_TEXT[r.status]}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="${iconPathFor(r.categorySlug)}"/></g>
+  </svg>`;
 }
 
-function pinElement(r: ReportSummary, delay: number): HTMLButtonElement {
-  const color = STATUS_COLOR[r.status];
+function pinElement(r: ReportSummary, quiet: boolean): HTMLButtonElement {
   const el = document.createElement("button");
   el.type = "button";
   el.className = "pin";
-  el.setAttribute("aria-label", `${r.title}, ${STATUS_LABEL[r.status]}`);
-  // No transition here: MapLibre positions this element with transform, so animating it makes pins wobble.
-  // Keep position:absolute here. `all:unset` would reset it to static, and MapLibre then drifts every pin on zoom.
-  el.style.cssText = "position:absolute;top:0;left:0;margin:0;padding:0;border:0;background:none;cursor:pointer;display:block;width:34px;height:44px";
-  // Motion lives on the inner svg and the pseudo-elements in globals.css: MapLibre owns the marker root's transform.
-  el.innerHTML = `<svg class="pin-svg" viewBox="0 0 34 44" width="34" height="44" style="display:block;transform-origin:50% 100%;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35));animation-delay:${delay}ms" aria-hidden="true">
-    <path d="M17 43C17 43 2 28 2 16a15 15 0 0 1 30 0c0 12-15 27-15 27Z" fill="${color}" stroke="#fff" stroke-width="2"/>
-    <circle cx="17" cy="16" r="10" fill="#fff"/>
-    <text x="17" y="21" text-anchor="middle" font-size="13">${glyphFor(r.categorySlug)}</text></svg>`;
-  // Hover/focus card with the photo and details; it does not move the pin. Built on first hover,
-  // so a map of hundreds of pins does not request every thumbnail up front.
-  let card: HTMLElement | null = null;
-  const show = (on: boolean) => () => {
-    // A selected pin already has its popup open, so a second card would stack on top of it.
-    if (on && el.dataset.selected) return;
-    if (on && !card) {
-      card = popupNode(r);
-      card.dataset.hoverCard = "";
-      card.className = "pin-card";
-      card.style.cssText = "position:absolute;left:50%;bottom:100%;margin:0 0 8px;transform:translateX(-50%);width:230px;background:#fff;color:#0f172a;border-radius:10px;padding:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.18);pointer-events:none;text-align:left;cursor:default";
-      el.append(card);
-    }
-    if (!card) return;
-    // The card always sits above the pin and lifts over neighbouring pins while hovered.
-    el.style.zIndex = on ? "6" : el.dataset.selected ? "5" : "";
-    card.style.display = on ? "block" : "none";
-  };
-  el.addEventListener("mouseenter", show(true));
-  el.addEventListener("focus", show(true));
-  el.addEventListener("mouseleave", show(false));
-  el.addEventListener("blur", show(false));
+  el.title = r.title;
+  el.setAttribute("aria-label", `${r.title}. ${STATUS_LABEL[r.status]}, ${r.categoryName}. Show details`);
+  // Keep position:absolute: MapLibre places markers with transform, and a static element drifts on zoom.
+  el.style.cssText = "position:absolute;top:0;left:0;margin:0;padding:0;border:0;background:none;cursor:pointer;display:block;width:32px;height:42px";
+  if (quiet) el.dataset.quiet = "";
+  el.innerHTML = pinSvg(r);
   return el;
 }
 
-function popupNode(r: ReportSummary): HTMLElement {
-  const root = document.createElement("div");
-  root.style.maxWidth = "230px";
+function clusterElement(count: number): HTMLButtonElement {
+  const el = document.createElement("button");
+  el.type = "button";
+  el.className = "cluster";
+  const size = count < 10 ? 36 : count < 50 ? 44 : 52;
+  el.setAttribute("aria-label", `${count} reports in this area. Zoom in`);
+  el.style.cssText = `position:absolute;top:0;left:0;width:${size}px;height:${size}px;border-radius:50%;border:3px solid #fff;background:#1d3557;color:#fff;font-weight:700;font-size:${count < 100 ? 14 : 12}px;line-height:1;font-family:inherit;cursor:pointer;box-shadow:0 0 0 4px rgb(29 53 87 / .25),0 2px 6px rgb(15 23 42 / .3)`;
+  el.textContent = String(count);
+  return el;
+}
 
-  // Same layout for every pin: photo on top, text below. Reports without a photo get a tinted placeholder.
+/** Preview card for a selected report. Built with textContent only: report text is user input. */
+function previewNode(r: ReportSummary, open: (href: string) => void): HTMLElement {
+  const root = document.createElement("div");
+  root.style.cssText = "width:260px;max-width:calc(100vw - 48px)";
   if (r.thumb) {
     const img = document.createElement("img");
     img.src = r.thumb;
     img.alt = "";
-    img.style.cssText = "width:100%;height:110px;object-fit:cover;border-radius:8px;margin-bottom:6px";
+    img.loading = "lazy";
+    img.style.cssText = "display:block;width:100%;height:132px;object-fit:cover;background:#e2e8f0";
     root.append(img);
-  } else {
-    const ph = document.createElement("div");
-    ph.textContent = glyphFor(r.categorySlug);
-    ph.style.cssText = `height:110px;display:grid;place-items:center;font-size:32px;border-radius:8px;margin-bottom:6px;background:${STATUS_COLOR[r.status]}1f`;
-    root.append(ph);
   }
-
+  const body = document.createElement("div");
+  body.style.cssText = "padding:12px 14px 14px";
   const status = document.createElement("div");
   status.textContent = STATUS_LABEL[r.status];
-  status.style.cssText = `font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${STATUS_COLOR[r.status]}`;
-
+  status.style.cssText = `display:inline-block;font-size:12px;font-weight:700;color:${STATUS_TEXT[r.status]};background:${STATUS_COLOR[r.status]}1a;border-radius:999px;padding:2px 9px`;
   const title = document.createElement("div");
   title.textContent = r.title;
-  title.style.cssText = "font-weight:600;margin:2px 0 4px;color:#0f172a";
-
+  title.style.cssText = "font-weight:700;font-size:15px;line-height:1.3;margin:8px 0 4px;color:#0f172a";
   const meta = document.createElement("div");
-  meta.textContent = [r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ");
-  meta.style.cssText = "font-size:12px;color:#64748b;margin-bottom:6px";
-
-  root.append(status, title, meta);
+  meta.textContent = [r.categoryName, r.problemType, r.barangay, `Reported ${formatDate(r.createdAt)}`].filter(Boolean).join(" · ");
+  meta.style.cssText = "font-size:13px;line-height:1.45;color:#475569;margin-bottom:12px";
+  const href = `/reports/${r.id}`;
+  const link = document.createElement("a");
+  link.href = href;
+  link.textContent = "View report →";
+  link.style.cssText = "display:inline-flex;align-items:center;min-height:36px;background:#1d3557;color:#fff;padding:0 14px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none";
+  link.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    open(href);
+  });
+  body.append(status, title, meta, link);
+  root.append(body);
   return root;
 }
 
-const ctrl =
-  "grid h-11 w-11 place-items-center rounded-xl bg-white text-slate-700 panel hover:bg-slate-50 active:scale-95 text-sm font-bold";
+function reportHereNode(lng: number, lat: number): HTMLElement {
+  const inside = withinBounds(lng, lat);
+  const root = document.createElement("div");
+  root.style.cssText = "padding:12px 14px;min-width:210px";
+  const head = document.createElement("div");
+  head.textContent = inside ? "Report a problem here?" : "Outside the municipality";
+  head.style.cssText = "font-weight:700;color:#0f172a";
+  const coords = document.createElement("div");
+  coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  coords.style.cssText = "font-size:12px;color:#475569;margin:2px 0 10px;font-variant-numeric:tabular-nums";
+  root.append(head, coords);
+  if (inside) {
+    const a = document.createElement("a");
+    a.href = `/report/new?lat=${lat}&lng=${lng}`;
+    a.textContent = "+ Report an issue here";
+    a.style.cssText = "display:inline-flex;align-items:center;min-height:36px;background:#c2410c;color:#fff;padding:0 12px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none";
+    root.append(a);
+  } else {
+    const note = document.createElement("div");
+    note.textContent = "Reports can only be placed inside the municipality.";
+    note.style.cssText = "font-size:13px;color:#475569";
+    root.append(note);
+  }
+  return root;
+}
 
-export default function ReportsMap({ reports, categories, selectedId, onSelect, className }: Props) {
+function toFeatures(reports: ReportSummary[]): GeoJSON.FeatureCollection<GeoJSON.Point, { id: string }> {
+  return {
+    type: "FeatureCollection",
+    features: reports.map((r) => ({ type: "Feature", geometry: { type: "Point", coordinates: [r.lng, r.lat] }, properties: { id: r.id } })),
+  };
+}
+
+function geoMessage(err: GeolocationPositionError): string {
+  if (err.code === err.PERMISSION_DENIED) return "Location access is blocked. Allow it in your browser settings, or move the map yourself.";
+  if (err.code === err.TIMEOUT) return "Finding your location took too long. Try again outdoors or move the map yourself.";
+  return "Your location is not available right now.";
+}
+
+const ctrl =
+  "grid h-11 w-11 place-items-center bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 aria-pressed:bg-ink-700 aria-pressed:text-white";
+
+/* ----------------------------- Component ----------------------------- */
+
+export default function ReportsMap({ reports, categories, selectedId, highlightId, onSelect, onViewChange, className }: Props) {
   const el = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MlMap | null>(null);
   const popupRef = useRef<MlPopup | null>(null);
   const markersRef = useRef<Map<string, { marker: MlMarker; el: HTMLElement }>>(new Map());
+  const meRef = useRef<MlMarker | null>(null);
   const reportsRef = useRef(reports);
   const onSelectRef = useRef(onSelect);
+  const onViewRef = useRef(onViewChange);
+  const firstPaint = useRef(true);
   const router = useRouter();
+  const routerRef = useRef(router);
   const [ready, setReady] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [tileErrors, setTileErrors] = useState(0);
-  const [visible, setVisible] = useState(reports.length);
   const [pitched, setPitched] = useState(false);
   const [terrain, setTerrain] = useState(false);
   const [bearing, setBearing] = useState(0);
@@ -128,150 +170,181 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
 
   reportsRef.current = reports;
   onSelectRef.current = onSelect;
-  const routerRef = useRef(router);
+  onViewRef.current = onViewChange;
   routerRef.current = router;
-
-  const countVisible = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const b = map.getBounds();
-    setVisible(reportsRef.current.filter((r) => b.contains([r.lng, r.lat])).length);
-  }, []);
 
   // Create the map once.
   useEffect(() => {
     let cancelled = false;
+    const markers = markersRef.current;
+
+    /** Rebuilds the visible markers from the clustered source: one per cluster, one per lone report. */
+    function sync(map: MlMap) {
+      if (!map.getSource(SOURCE)) return;
+      const byId = new Map(reportsRef.current.map((r) => [r.id, r]));
+      const seen = new Set<string>();
+      const inView = new Set<string>();
+      const bounds = map.getBounds();
+      for (const r of reportsRef.current) if (bounds.contains([r.lng, r.lat])) inView.add(r.id);
+
+      import("maplibre-gl").then(({ Marker }) => {
+        if (!mapRef.current) return;
+        for (const f of map.querySourceFeatures(SOURCE)) {
+          const p = f.properties as { cluster?: boolean; cluster_id?: number; point_count?: number; id?: string };
+          const [lng, lat] = (f.geometry as GeoJSON.Point).coordinates;
+          if (p.cluster) {
+            const key = `cluster:${p.cluster_id}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            if (markers.has(key)) continue;
+            const node = clusterElement(p.point_count ?? 0);
+            node.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              const zoom = await (map.getSource(SOURCE) as GeoJSONSource).getClusterExpansionZoom(p.cluster_id!);
+              map.easeTo({ center: [lng, lat], zoom: Math.min(zoom, CLUSTER_MAX_ZOOM + 1), duration: 450 });
+            });
+            markers.set(key, { marker: new Marker({ element: node }).setLngLat([lng, lat]).addTo(map), el: node });
+          } else if (p.id && byId.has(p.id)) {
+            if (seen.has(p.id)) continue;
+            seen.add(p.id);
+            if (markers.has(p.id)) continue;
+            const r = byId.get(p.id)!;
+            const node = pinElement(r, !firstPaint.current);
+            node.addEventListener("click", (e) => {
+              e.stopPropagation();
+              onSelectRef.current(r.id);
+            });
+            markers.set(r.id, { marker: new Marker({ element: node, anchor: "bottom" }).setLngLat([r.lng, r.lat]).addTo(map), el: node });
+          }
+        }
+        for (const [key, m] of markers) {
+          if (!seen.has(key)) {
+            m.marker.remove();
+            markers.delete(key);
+          }
+        }
+        if (seen.size > 0) firstPaint.current = false;
+        markSelection();
+        onViewRef.current?.(inView);
+      });
+    }
+
     (async () => {
       if (!el.current) return;
-      const map = await createMap(el.current, { controls: false, vector: true });
-      map.on("error", (e) => {
-        // Count failed tile requests so the page can say the basemap is unavailable.
-        const err = e as unknown as { error?: Error; tile?: unknown };
-        if (err.tile) setTileErrors((n) => n + 1);
-      });
+      let map: MlMap;
+      try {
+        map = await createMap(el.current, { controls: false, vector: true });
+      } catch (err) {
+        // No WebGL (old phones, some locked-down browsers): the list stays usable.
+        console.error("[map] could not start:", err);
+        if (!cancelled) setFailed(true);
+        return;
+      }
       if (cancelled) {
         map.remove();
         return;
       }
       mapRef.current = map;
-      map.on("moveend", countVisible);
+      // The map is display:none in the phone list view; redraw at the right size when it comes back.
+      const resize = new ResizeObserver(() => map.resize());
+      resize.observe(el.current!);
+      map.once("remove", () => resize.disconnect());
+      map.on("error", (e) => {
+        if ((e as unknown as { tile?: unknown }).tile) setTileErrors((n) => n + 1);
+      });
       map.on("rotate", () => setBearing(map.getBearing()));
+      map.on("moveend", () => sync(map));
+      map.on("sourcedata", (e) => {
+        if (e.sourceId === SOURCE && e.isSourceLoaded) sync(map);
+      });
       map.on("click", (e) => {
-        // Clicks on pins stop propagating in the pin element, so this only fires on open map.
-        const { lng, lat } = e.lngLat;
-        popupRef.current?.remove();
-        popupRef.current = null;
+        // Pin and cluster clicks stop propagating, so this only fires on open map.
         onSelectRef.current(null);
-        const inside = withinBounds(lng, lat);
         import("maplibre-gl").then(({ Popup }) => {
           if (!mapRef.current) return;
-          const root = document.createElement("div");
-          root.style.cssText = "min-width:200px";
-          const head = document.createElement("div");
-          head.textContent = inside ? "Report an issue here?" : "Outside the municipality";
-          head.style.cssText = "font-weight:600;color:#0f172a";
-          const coords = document.createElement("div");
-          coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-          coords.style.cssText = "font-size:12px;color:#64748b;margin:2px 0 8px";
-          root.append(head, coords);
-          if (inside) {
-            const a = document.createElement("a");
-            a.href = `/report/new?lat=${lat}&lng=${lng}`;
-            a.textContent = "+ Report a problem here";
-            a.style.cssText = "display:inline-block;background:#ea580c;color:#fff;padding:7px 12px;border-radius:8px;font-weight:600;font-size:13px;text-decoration:none";
-            root.append(a);
-          } else {
-            const note = document.createElement("div");
-            note.textContent = "Reports can only be placed inside the city.";
-            note.style.cssText = "font-size:12px;color:#64748b";
-            root.append(note);
-          }
-          const popup = new Popup({ offset: 8, closeButton: true, maxWidth: "260px" })
-            .setLngLat([lng, lat])
-            .setDOMContent(root)
+          popupRef.current?.remove();
+          popupRef.current = new Popup({ offset: 8, maxWidth: "280px" })
+            .setLngLat(e.lngLat)
+            .setDOMContent(reportHereNode(e.lngLat.lng, e.lngLat.lat))
             .addTo(mapRef.current);
-          popupRef.current = popup;
         });
       });
-      // Pins can be added as soon as the style exists; tiles may still be loading.
-      map.once("style.load", () => setReady(true));
-      if (map.isStyleLoaded()) setReady(true);
+      const addSource = () => {
+        if (map.getSource(SOURCE)) return;
+        map.addSource(SOURCE, { type: "geojson", data: toFeatures(reportsRef.current), cluster: true, clusterRadius: 46, clusterMaxZoom: CLUSTER_MAX_ZOOM });
+        // Invisible layer: a source only loads tiles (and answers querySourceFeatures) while a layer uses it.
+        map.addLayer({ id: `${SOURCE}-hit`, type: "circle", source: SOURCE, paint: { "circle-radius": 0, "circle-opacity": 0 } });
+        setReady(true);
+      };
+      // style.load also fires after the vector style falls back to raster, which drops every source.
+      map.on("style.load", addSource);
+      if (map.isStyleLoaded()) addSource();
     })();
-    const markers = markersRef.current;
+
     return () => {
       cancelled = true;
       popupRef.current = null;
       markers.forEach((m) => m.marker.remove());
       markers.clear();
+      meRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
       setReady(false);
     };
-  }, [countVisible]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Keep one marker per report.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
-    let cancelled = false;
-    (async () => {
-      const { Marker } = await import("maplibre-gl");
-      if (cancelled) return;
-      const markers = markersRef.current;
-      const ids = new Set(reports.map((r) => r.id));
-      for (const [id, m] of markers) {
-        if (!ids.has(id)) {
-          m.marker.remove();
-          markers.delete(id);
-        }
-      }
-      let added = 0;
-      for (const r of reports) {
-        if (markers.has(r.id)) continue;
-        const node = pinElement(r, Math.min(added++, 25) * 40);
-        node.addEventListener("click", (e) => {
-          e.stopPropagation();
-          launchReport(map, routerRef.current, r, node);
-        });
-        const marker = new Marker({ element: node, anchor: "bottom" }).setLngLat([r.lng, r.lat]).addTo(map);
-        markers.set(r.id, { marker, el: node });
-      }
-      countVisible();
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [reports, ready, countVisible]);
-
-  // Highlight the selected pin and show its popup.
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!ready || !map) return;
-
+  /** Reflects selection and list hover on the pin elements. */
+  function markSelection() {
     markersRef.current.forEach((m, id) => {
-      m.el.style.zIndex = id === selectedId ? "5" : "";
-      m.el.dataset.selected = id === selectedId ? "1" : "";
-      const hover = m.el.querySelector<HTMLElement>("[data-hover-card]");
-      if (hover && id === selectedId) hover.style.display = "none";
+      m.el.dataset.selected = id === selectedRef.current ? "1" : "";
+      m.el.dataset.hover = id === highlightRef.current ? "1" : "";
+      m.el.style.zIndex = id === selectedRef.current ? "5" : id === highlightRef.current ? "4" : "";
     });
+  }
+  const selectedRef = useRef(selectedId);
+  const highlightRef = useRef(highlightId);
+  selectedRef.current = selectedId;
+  highlightRef.current = highlightId;
 
+  // New results: replace the source data; clusters and pins rebuild from it.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    // Cluster ids change with the data, so cluster markers cannot be reused.
+    for (const [key, m] of markersRef.current) {
+      if (key.startsWith("cluster:")) {
+        m.marker.remove();
+        markersRef.current.delete(key);
+      }
+    }
+    (map.getSource(SOURCE) as GeoJSONSource | undefined)?.setData(toFeatures(reports));
+  }, [reports, ready]);
+
+  useEffect(() => {
+    if (ready) markSelection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightId, ready]);
+
+  // Selected report: raise its pin, open the preview and bring it into view.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map) return;
+    markSelection();
     if (popupRef.current) {
       const old = popupRef.current;
       popupRef.current = null;
       old.remove();
     }
-
-    // Read the list through the ref: a filter change must not re-open the popup or move the map.
+    // Read through the ref: a filter change must not re-open the popup or move the map.
     const report = selectedId ? reportsRef.current.find((r) => r.id === selectedId) : undefined;
     if (!report) return;
-
     let cancelled = false;
-    (async () => {
-      const { Popup } = await import("maplibre-gl");
+    import("maplibre-gl").then(({ Popup }) => {
       if (cancelled || !mapRef.current) return;
-      const popup = new Popup({ offset: [0, -40], closeButton: true, maxWidth: "250px" })
+      const popup = new Popup({ offset: [0, -40], maxWidth: "300px", focusAfterOpen: true })
         .setLngLat([report.lng, report.lat])
-        .setDOMContent(popupNode(report))
+        .setDOMContent(previewNode(report, (href) => routerRef.current.push(href)))
         .addTo(mapRef.current);
       popup.on("close", () => {
         if (popupRef.current === popup) {
@@ -280,11 +353,12 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
         }
       });
       popupRef.current = popup;
-      mapRef.current.easeTo({ center: [report.lng, report.lat], zoom: Math.max(mapRef.current.getZoom(), 15), duration: 500 });
-    })();
+      mapRef.current.easeTo({ center: [report.lng, report.lat], zoom: Math.max(mapRef.current.getZoom(), CLUSTER_MAX_ZOOM + 1), duration: 500 });
+    });
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, ready]);
 
   function toggle3d() {
@@ -292,7 +366,7 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
     if (!map) return;
     const next = !pitched;
     setPitched(next);
-    map.easeTo({ pitch: next ? 62 : 0, bearing: next ? map.getBearing() : 0, duration: 600 });
+    map.easeTo({ pitch: next ? 60 : 0, bearing: next ? map.getBearing() : 0, duration: 600 });
   }
 
   function toggleTerrain() {
@@ -322,114 +396,149 @@ export default function ReportsMap({ reports, categories, selectedId, onSelect, 
   }
 
   function locate() {
-    if (!navigator.geolocation) return setGeoError("Location is not available in this browser.");
+    if (!navigator.geolocation) return setGeoError("This browser cannot share your location. Move the map yourself.");
     setLocating(true);
     setGeoError(null);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         setLocating(false);
-        mapRef.current?.flyTo({ center: [pos.coords.longitude, pos.coords.latitude], zoom: 16 });
+        const map = mapRef.current;
+        if (!map) return;
+        const here: [number, number] = [pos.coords.longitude, pos.coords.latitude];
+        if (!withinBounds(here[0], here[1])) {
+          setGeoError("You appear to be outside the municipality, so the map stays where it is.");
+          return;
+        }
+        const { Marker } = await import("maplibre-gl");
+        meRef.current?.remove();
+        const dot = document.createElement("div");
+        dot.setAttribute("aria-label", "Your location");
+        dot.style.cssText = "width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 6px rgb(37 99 235 / .25)";
+        meRef.current = new Marker({ element: dot }).setLngLat(here).addTo(map);
+        map.flyTo({ center: here, zoom: 16 });
       },
-      () => {
+      (err) => {
         setLocating(false);
-        setGeoError("We couldn't get your location. Check the browser permission.");
+        setGeoError(geoMessage(err));
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
   }
 
+  if (failed) {
+    return (
+      <div className={`grid place-items-center bg-slate-100 p-6 text-center ${className ?? ""}`}>
+        <div className="max-w-xs">
+          <Icon name="map" className="mx-auto h-8 w-8 text-slate-400" />
+          <p className="mt-3 font-semibold text-slate-800">The map cannot be shown on this device</p>
+          <p className="mt-1 text-sm text-slate-600">Every report is still in the list.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className={`relative ${className ?? ""}`}>
-      <div ref={el} className="h-full w-full bg-[#e8ecef]" role="application" aria-label="Map of reported issues" />
+    <div className={`relative overflow-hidden ${className ?? ""}`}>
+      <div ref={el} className="h-full w-full bg-[#e8ecef]" role="region" aria-label="Map of reported issues. Use the list for a keyboard-friendly view." />
+
+      {!ready && (
+        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#e8ecef]" role="status">
+          <span className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-[var(--shadow-panel)]">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-200 border-t-ink-700" aria-hidden />
+            Loading map…
+          </span>
+        </div>
+      )}
 
       {tileErrors >= 3 && (
-        <p role="status" className="absolute bottom-20 left-1/2 max-w-sm -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-600 shadow-md">
-          The street map is slow to load. Your reports are still shown on the pins.
+        <p role="status" className="absolute left-1/2 top-3 max-w-[calc(100%-6rem)] -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-700 shadow-[var(--shadow-panel)]">
+          The street map is slow to load. Report pins are still shown.
         </p>
       )}
-
-      <div className="pointer-events-none absolute bottom-6 left-1/2 -translate-x-1/2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 panel" aria-live="polite">
-        {visible} report{visible === 1 ? "" : "s"} visible
-      </div>
 
       {geoError && (
-        <p role="alert" className="absolute right-3 top-16 max-w-xs rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 shadow-md">
-          {geoError}
-        </p>
+        <div role="alert" className="absolute left-3 right-16 top-3 flex items-start gap-2 rounded-lg bg-white px-3 py-2 text-sm text-red-800 shadow-[var(--shadow-panel)] sm:left-auto sm:right-16 sm:max-w-xs">
+          <Icon name="alert" className="mt-0.5 h-4 w-4 flex-none" />
+          <span className="flex-1">{geoError}</span>
+          <button type="button" onClick={() => setGeoError(null)} aria-label="Dismiss" className="-mr-1 grid h-6 w-6 place-items-center rounded text-slate-500 hover:bg-slate-100">
+            <Icon name="x" className="h-3.5 w-3.5" />
+          </button>
+        </div>
       )}
 
-      <div className="absolute bottom-6 left-3">
+      <div className="absolute bottom-20 left-3 flex flex-col items-start gap-2 lg:bottom-8">
         {legend && (
-          <div className="mb-2 w-64 rounded-xl bg-white p-4 text-sm shadow-lg ring-1 ring-black/5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+          <div id="map-legend" className="panel animate-fade-up max-h-[50svh] w-64 overflow-y-auto p-4 text-sm">
+            <p className="eyebrow mb-2">Pin colour: status</p>
             <ul className="space-y-1.5">
               {PUBLIC_STATUSES.map((s) => (
                 <li key={s} className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full" style={{ backgroundColor: STATUS_COLOR[s] }} />
+                  <span className="h-3 w-3 rounded-full ring-2 ring-white" style={{ backgroundColor: STATUS_COLOR[s] }} aria-hidden />
                   {STATUS_LABEL[s]}
                 </li>
               ))}
+              <li className="flex items-center gap-2">
+                <span className="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-[8px] font-bold text-white" aria-hidden>
+                  3
+                </span>
+                Group of nearby reports
+              </li>
             </ul>
-            <p className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">Category</p>
-            <ul className="grid grid-cols-1 gap-1.5">
+            <p className="eyebrow mb-2 mt-4">Pin icon: category</p>
+            <ul className="space-y-1.5">
               {categories.map((c) => (
                 <li key={c.slug} className="flex items-center gap-2">
-                  <span className="w-5 text-center" aria-hidden>{glyphFor(c.slug)}</span>
+                  <CategoryIcon slug={c.slug} className="h-4 w-4 text-slate-600" />
                   {c.name}
                 </li>
               ))}
             </ul>
           </div>
         )}
-        <button
-          type="button"
-          onClick={() => setLegend((v) => !v)}
-          aria-expanded={legend}
-          className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-semibold text-slate-800 panel hover:bg-slate-50"
-        >
-          <span className="grid h-5 w-5 place-items-center rounded-full border-2 border-slate-700 text-[11px] leading-none">?</span>
+        <button type="button" onClick={() => setLegend((v) => !v)} aria-expanded={legend} aria-controls="map-legend" className="panel inline-flex h-11 items-center gap-2 px-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+          <Icon name="layers" className="h-4.5 w-4.5" />
           Legend
         </button>
       </div>
 
-      <div className="absolute bottom-6 right-3 flex flex-col gap-2">
-        <button type="button" onClick={toggle3d} aria-pressed={pitched} aria-label="Toggle 3D view" className={`${ctrl} ${pitched ? "!bg-ink-700 !text-white" : ""}`}>
-          3D
-        </button>
-        <button type="button" onClick={toggleTerrain} aria-pressed={terrain} aria-label="Toggle terrain" className={`${ctrl} ${terrain ? "!bg-ink-700 !text-white" : ""}`}>
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden>
-            <path d="M3 19 9 8l4 7 3-4 5 8H3Z" />
-          </svg>
-        </button>
-        <div className="overflow-hidden rounded-xl bg-white panel">
-          <button type="button" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom in" className="grid h-11 w-11 place-items-center text-xl hover:bg-slate-50">
-            +
+      <div className="absolute bottom-20 right-3 flex flex-col gap-2 lg:bottom-8">
+        <div className="panel flex flex-col divide-y divide-slate-100 overflow-hidden">
+          <button type="button" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom in" className={ctrl}>
+            <Icon name="plus" />
           </button>
-          <button type="button" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom out" className="grid h-11 w-11 place-items-center border-t border-slate-100 text-xl hover:bg-slate-50">
-            −
+          <button type="button" onClick={() => mapRef.current?.zoomOut()} aria-label="Zoom out" className={ctrl}>
+            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <path d="M5 12h14" />
+            </svg>
           </button>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: 500 });
-            setPitched(false);
-          }}
-          aria-label="Reset north"
-          className={ctrl}
-        >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" style={{ transform: `rotate(${-bearing}deg)` }} aria-hidden>
-            <path d="M12 3 16 12H8l4-9Z" fill="#dc2626" />
-            <path d="m12 21-4-9h8l-4 9Z" fill="#94a3b8" />
-          </svg>
-        </button>
-        <button type="button" onClick={locate} disabled={locating} aria-label="Show my location" className={ctrl}>
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v3M12 19v3M2 12h3M19 12h3" strokeLinecap="round" />
-            <circle cx="12" cy="12" r="8" />
-          </svg>
-        </button>
+        <div className="panel flex flex-col divide-y divide-slate-100 overflow-hidden">
+          <button type="button" onClick={locate} disabled={locating} aria-label="Show my location" className={ctrl}>
+            {locating ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-200 border-t-ink-700" aria-hidden /> : <Icon name="locate" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              mapRef.current?.easeTo({ bearing: 0, pitch: 0, duration: 500 });
+              setPitched(false);
+            }}
+            aria-label="Reset the view to north"
+            className={ctrl}
+          >
+            <svg viewBox="0 0 24 24" className="h-5 w-5" style={{ transform: `rotate(${-bearing}deg)` }} aria-hidden>
+              <path d="M12 3 16 12H8l4-9Z" fill="#b91c1c" />
+              <path d="m12 21-4-9h8l-4 9Z" fill="#94a3b8" />
+            </svg>
+          </button>
+        </div>
+        <div className="panel hidden flex-col divide-y divide-slate-100 overflow-hidden sm:flex">
+          <button type="button" onClick={toggle3d} aria-pressed={pitched} aria-label="3D view" className={`${ctrl} text-sm font-bold`}>
+            3D
+          </button>
+          <button type="button" onClick={toggleTerrain} aria-pressed={terrain} aria-label="Show terrain" className={ctrl}>
+            <Icon name="mountain" />
+          </button>
+        </div>
       </div>
     </div>
   );

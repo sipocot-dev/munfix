@@ -6,6 +6,10 @@ import { useState } from "react";
 import type { ReportNote } from "@/lib/reports";
 import { apiError } from "@/lib/client";
 import { formatDateTime } from "@/lib/format";
+import Alert from "./ui/Alert";
+import { useConfirm, useToast } from "./ui/Feedback";
+import Icon from "./ui/Icon";
+import Spinner from "./ui/Spinner";
 
 interface Props {
   id: string;
@@ -15,120 +19,171 @@ interface Props {
   followups: ReportNote[];
 }
 
+/** Feedback and follow-up requests from residents, kept in the report's public history. */
 export default function CommunityActions({ id, signedIn, canReopen, feedback, followups }: Props) {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [feedbackText, setFeedbackText] = useState("");
-  const [followupText, setFollowupText] = useState("");
 
   /** POSTs to the report and refreshes the page. Returns true on success. */
   async function send(key: string, url: string, body?: { text: string }): Promise<boolean> {
     setBusy(key);
     setError(null);
-    const res = await fetch(url, {
-      method: "POST",
-      headers: body ? { "Content-Type": "application/json" } : undefined,
-      body: body ? JSON.stringify(body) : undefined,
-    });
-    setBusy(null);
-    if (!res.ok) {
-      setError(apiError(await res.json().catch(() => ({}))));
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      if (!res.ok) {
+        setError(apiError(await res.json().catch(() => ({}))));
+        return false;
+      }
+      router.refresh();
+      return true;
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
       return false;
+    } finally {
+      setBusy(null);
     }
-    router.refresh();
-    return true;
   }
 
   async function reopen() {
-    if (!window.confirm("Reopen this task? It moves back to In progress.")) return;
-    await send("reopen", `/api/v1/reports/${id}/reopen`);
+    const ok = await confirm({
+      title: "Reopen this report?",
+      body: "It moves back to In progress so city staff take another look. Use this when the problem is not actually fixed.",
+      confirmLabel: "Reopen",
+    });
+    if (ok && (await send("reopen", `/api/v1/reports/${id}/reopen`))) toast("The report is back in progress.");
   }
 
   return (
-    <section className="card space-y-6 p-5">
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Feedback</h2>
-        <NoteList notes={feedback} empty="No feedback yet." />
-        {signedIn ? (
-          <form
-            className="space-y-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (await send("feedback", `/api/v1/reports/${id}/feedback`, { text: feedbackText })) setFeedbackText("");
-            }}
-          >
-            <textarea
-              value={feedbackText}
-              onChange={(e) => setFeedbackText(e.target.value)}
-              maxLength={1000}
-              rows={3}
-              required
-              aria-label="Your feedback"
-              className="field"
-              placeholder="How did the fix go?"
-            />
-            <button type="submit" disabled={busy !== null} className="btn btn-secondary">
-              {busy === "feedback" ? "Sending…" : "Send feedback"}
-            </button>
-          </form>
-        ) : (
-          <p className="text-sm text-slate-600">
-            <Link href={`/login?next=/reports/${id}`} className="font-semibold text-ink-700 hover:underline">Log in</Link> to leave feedback.
-          </p>
-        )}
+    <section className="card p-5 sm:p-6" aria-labelledby="community-title">
+      <h2 id="community-title" className="text-lg font-semibold">
+        Community
+      </h2>
+      <p className="mt-1 text-sm text-slate-600">Tell city staff how the fix went, or ask for another visit. Entries are public; your name is not shown.</p>
+
+      <div className="mt-5 grid gap-6 md:grid-cols-2">
+        <NoteThread
+          title="Feedback"
+          notes={feedback}
+          empty="No feedback yet."
+          signedIn={signedIn}
+          busy={busy}
+          id={id}
+          kind="feedback"
+          placeholder="How did the fix go?"
+          submitLabel="Send feedback"
+          onSend={async (text) => (await send("feedback", `/api/v1/reports/${id}/feedback`, { text })) && (toast("Thanks, your feedback was added."), true)}
+        />
+        <NoteThread
+          title="Follow-up requests"
+          notes={followups}
+          empty="No follow-up requests yet."
+          signedIn={signedIn}
+          busy={busy}
+          id={id}
+          kind="followup"
+          placeholder="For example: the problem is still there."
+          submitLabel="Request follow-up"
+          onSend={async (text) => (await send("followup", `/api/v1/reports/${id}/followups`, { text })) && (toast("Your follow-up request was added."), true)}
+        />
       </div>
 
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold">Follow-up requests</h2>
-        <NoteList notes={followups} empty="No follow-up requests yet." />
-        {signedIn ? (
-          <form
-            className="space-y-2"
-            onSubmit={async (e) => {
-              e.preventDefault();
-              if (await send("followup", `/api/v1/reports/${id}/followups`, { text: followupText })) setFollowupText("");
-            }}
-          >
-            <textarea
-              value={followupText}
-              onChange={(e) => setFollowupText(e.target.value)}
-              maxLength={1000}
-              rows={2}
-              required
-              aria-label="Follow-up request"
-              className="field"
-              placeholder="Ask for a visit, for example if the problem is still there."
-            />
-            <button type="submit" disabled={busy !== null} className="btn btn-secondary">
-              {busy === "followup" ? "Sending…" : "Request follow-up"}
-            </button>
-          </form>
-        ) : null}
-      </div>
+      {error && (
+        <Alert tone="danger" className="mt-4">
+          {error}
+        </Alert>
+      )}
 
       {canReopen && (
-        <button type="button" onClick={reopen} disabled={busy !== null} className="btn btn-secondary">
-          {busy === "reopen" ? "Reopening…" : "Reopen task"}
-        </button>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
+          <p className="text-sm text-slate-600">Not actually fixed?</p>
+          <button type="button" onClick={reopen} disabled={busy !== null} className="btn btn-secondary btn-sm">
+            {busy === "reopen" ? <Spinner /> : <Icon name="refresh" className="h-4 w-4" />}
+            {busy === "reopen" ? "Reopening…" : "Reopen report"}
+          </button>
+        </div>
       )}
-      {error && <p className="text-sm text-red-700">{error}</p>}
     </section>
   );
 }
 
-function NoteList({ notes, empty }: { notes: ReportNote[]; empty: string }) {
-  if (notes.length === 0) return <p className="text-sm text-slate-500">{empty}</p>;
+function NoteThread({
+  title,
+  notes,
+  empty,
+  signedIn,
+  busy,
+  id,
+  kind,
+  placeholder,
+  submitLabel,
+  onSend,
+}: {
+  title: string;
+  notes: ReportNote[];
+  empty: string;
+  signedIn: boolean;
+  busy: string | null;
+  id: string;
+  kind: string;
+  placeholder: string;
+  submitLabel: string;
+  onSend: (text: string) => Promise<boolean>;
+}) {
+  const [text, setText] = useState("");
+  const fieldId = `${kind}-text`;
   return (
-    <ul className="space-y-3">
-      {notes.map((n) => (
-        <li key={n.id} className="border-l-2 border-slate-200 pl-3">
-          <p className="whitespace-pre-line text-sm text-slate-700">{n.text}</p>
-          <p className="text-xs text-slate-500">
-            {n.actorName ?? "A resident"} · {formatDateTime(n.createdAt)}
-          </p>
-        </li>
-      ))}
-    </ul>
+    <div className="flex min-w-0 flex-col">
+      <h3 className="flex items-center gap-2 font-semibold text-slate-900">
+        <Icon name="message" className="h-4.5 w-4.5 text-slate-500" />
+        {title}
+        <span className="rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-600">{notes.length}</span>
+      </h3>
+      {notes.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-600">{empty}</p>
+      ) : (
+        <ul className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
+          {notes.map((n) => (
+            <li key={n.id} className="rounded-lg bg-slate-50 px-3 py-2.5">
+              <p className="whitespace-pre-line break-words text-sm text-slate-800">{n.text}</p>
+              <p className="mt-1 text-xs text-slate-600">
+                {n.actorName ?? "A resident"} · <time dateTime={n.createdAt}>{formatDateTime(n.createdAt)}</time>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+      {signedIn ? (
+        <form
+          className="mt-3 space-y-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (await onSend(text)) setText("");
+          }}
+        >
+          <label htmlFor={fieldId} className="sr-only">
+            {title}
+          </label>
+          <textarea id={fieldId} value={text} onChange={(e) => setText(e.target.value)} maxLength={1000} rows={2} required className="field" placeholder={placeholder} />
+          <button type="submit" disabled={busy !== null || !text.trim()} className="btn btn-secondary btn-sm">
+            {busy === kind && <Spinner />}
+            {busy === kind ? "Sending…" : submitLabel}
+          </button>
+        </form>
+      ) : (
+        <p className="mt-3 text-sm text-slate-600">
+          <Link href={`/login?next=/reports/${id}`} className="link">
+            Log in
+          </Link>{" "}
+          to add yours.
+        </p>
+      )}
+    </div>
   );
 }

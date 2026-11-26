@@ -2,8 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { apiError } from "@/lib/client";
-import type { Status } from "@/lib/status";
+import { apiError, extractId } from "@/lib/client";
+import { STATUS_LABEL, type Status } from "@/lib/status";
+import Alert from "./ui/Alert";
+import { useToast } from "./ui/Feedback";
+import FormField from "./ui/FormField";
+import Spinner from "./ui/Spinner";
 
 const ACTION_LABEL: Partial<Record<Status, string>> = {
   under_review: "Start review",
@@ -14,14 +18,22 @@ const ACTION_LABEL: Partial<Record<Status, string>> = {
   duplicate: "Mark duplicate…",
 };
 
-const PLACEHOLDER: Partial<Record<Status, string>> = {
-  verified: "Optional note shown on the public timeline",
-  in_progress: "e.g. Crew scheduled for Thursday",
-  resolved: "e.g. Pothole filled and road repaved",
-  rejected: "Reason (required) — the reporter will see this",
+const NOTE_HINT: Partial<Record<Status, string>> = {
+  verified: "Optional. Shown on the public timeline.",
+  in_progress: "Optional. For example: Crew scheduled for Thursday.",
+  resolved: "Optional. For example: Pothole filled and road repaved.",
+  rejected: "Required. The reporter sees this reason.",
+  duplicate: "Optional note for the reporter.",
 };
 
-/** Moderator actions for one report. Every action is written to the audit log. */
+/** The actions that publish or move work forward get the strong style; rejecting gets the danger style. */
+function buttonClass(to: Status, pending: Status | null): string {
+  if (to === "rejected") return "btn-danger";
+  if (pending === to || to === "verified" || to === "resolved") return "btn-primary";
+  return "btn-secondary";
+}
+
+/** Moderator and field-staff actions for one report. Every action is written to the audit log. */
 export default function TransitionControls({
   id,
   allowed,
@@ -29,9 +41,11 @@ export default function TransitionControls({
 }: {
   id: string;
   allowed: Status[];
-  onDone?: () => void;
+  /** Called with the new status after the server accepted the change. */
+  onDone?: (to: Status) => void;
 }) {
   const router = useRouter();
+  const toast = useToast();
   const [pending, setPending] = useState<Status | null>(null);
   const [note, setNote] = useState("");
   const [duplicateOf, setDuplicateOf] = useState("");
@@ -39,14 +53,14 @@ export default function TransitionControls({
   const [error, setError] = useState<string | null>(null);
 
   if (allowed.length === 0) {
-    return <p className="text-sm text-slate-500">No further actions available.</p>;
+    return <p className="text-sm text-slate-600">No further actions for your role at this stage.</p>;
   }
 
   function choose(to: Status) {
     setError(null);
-    // Actions that need extra input open a small form first.
+    // Starting a review needs nothing else; every other action opens a short form first.
     if (to === "under_review") void submit(to);
-    else setPending(to);
+    else setPending(pending === to ? null : to);
   }
 
   async function submit(to: Status) {
@@ -59,21 +73,18 @@ export default function TransitionControls({
         body: JSON.stringify({
           to,
           note: note.trim() || undefined,
-          duplicateOf: to === "duplicate" ? duplicateOf.trim() : undefined,
+          duplicateOf: to === "duplicate" ? extractId(duplicateOf) : undefined,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(apiError(data));
-        return;
-      }
+      if (!res.ok) return setError(apiError(await res.json().catch(() => ({}))));
       setPending(null);
       setNote("");
       setDuplicateOf("");
-      if (onDone) onDone();
+      toast(`Moved to ${STATUS_LABEL[to]}.`);
+      if (onDone) onDone(to);
       else router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError("Could not reach the server. Nothing was changed.");
     } finally {
       setBusy(false);
     }
@@ -87,10 +98,12 @@ export default function TransitionControls({
             key={to}
             type="button"
             disabled={busy}
+            aria-expanded={to === "under_review" ? undefined : pending === to}
             onClick={() => choose(to)}
-            className={`btn !py-1.5 ${to === "rejected" ? "btn-danger" : pending === to ? "btn-primary" : "btn-secondary"}`}
+            className={`btn btn-sm ${buttonClass(to, pending)}`}
           >
-            {ACTION_LABEL[to] ?? to}
+            {busy && to === "under_review" && <Spinner />}
+            {ACTION_LABEL[to] ?? STATUS_LABEL[to]}
           </button>
         ))}
       </div>
@@ -101,44 +114,30 @@ export default function TransitionControls({
             e.preventDefault();
             void submit(pending);
           }}
-          className="space-y-2 rounded-lg bg-slate-50 p-3"
+          className="animate-fade-up space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3.5"
+          aria-label={ACTION_LABEL[pending]?.replace("…", "")}
         >
           {pending === "duplicate" && (
-            <input
-              value={duplicateOf}
-              onChange={(e) => setDuplicateOf(e.target.value)}
-              required
-              placeholder="ID of the original report (from its URL)"
-              className="field"
-              aria-label="Original report ID"
-            />
+            <FormField label="Original report" hint="Paste the original report's link or ID (from its address bar).">
+              <input value={duplicateOf} onChange={(e) => setDuplicateOf(e.target.value)} required className="field" autoComplete="off" spellCheck={false} />
+            </FormField>
           )}
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            required={pending === "rejected"}
-            maxLength={500}
-            rows={2}
-            placeholder={PLACEHOLDER[pending] ?? "Optional note"}
-            className="field"
-            aria-label="Note"
-          />
-          <div className="flex gap-2">
-            <button type="submit" disabled={busy} className="btn btn-primary !py-1.5">
-              {busy ? "Saving…" : "Confirm"}
+          <FormField label={pending === "rejected" ? "Reason" : "Note"} hint={NOTE_HINT[pending]}>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} required={pending === "rejected"} maxLength={500} rows={2} className="field" />
+          </FormField>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={busy} className={`btn btn-sm ${pending === "rejected" ? "btn-danger-solid" : "btn-primary"}`}>
+              {busy && <Spinner />}
+              {busy ? "Saving…" : `Confirm: ${STATUS_LABEL[pending]}`}
             </button>
-            <button type="button" onClick={() => setPending(null)} className="btn btn-secondary !py-1.5">
+            <button type="button" onClick={() => setPending(null)} className="btn btn-ghost btn-sm">
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      {error && (
-        <p role="alert" className="text-sm text-red-700">
-          {error}
-        </p>
-      )}
+      {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );
 }

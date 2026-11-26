@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 import { apiError } from "@/lib/client";
+import { useToast } from "./ui/Feedback";
+import Icon from "./ui/Icon";
 
+/** Email updates on/off. Optimistic: the switch flips at once and rolls back if saving fails. */
 export default function NotificationToggle({ initial }: { initial: boolean }) {
+  const toast = useToast();
   const [on, setOn] = useState(initial);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function change(next: boolean) {
-    setOn(next); // optimistic
+    setOn(next);
     setBusy(true);
     setError(null);
     try {
@@ -21,34 +25,46 @@ export default function NotificationToggle({ initial }: { initial: boolean }) {
       if (!res.ok) {
         setOn(!next);
         setError(apiError(await res.json().catch(() => ({}))));
+      } else {
+        toast(next ? "Email updates are on." : "Email updates are off.");
       }
     } catch {
       setOn(!next);
-      setError("Could not save your preference.");
+      setError("Could not save your preference. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <div className="card mb-6 flex flex-wrap items-center justify-between gap-3 p-4">
-      <div>
-        <p className="font-semibold">Email updates</p>
-        <p className="text-sm text-slate-600">Get an email when the status of one of your reports changes.</p>
-        {error && <p role="alert" className="mt-1 text-sm text-red-700">{error}</p>}
+    <div className="card flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
+      <div className="flex gap-3">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-ink-50 text-ink-700">
+          <Icon name="mail" className="h-5 w-5" />
+        </span>
+        <div>
+          <p id="email-updates-label" className="font-semibold text-slate-900">
+            Email updates
+          </p>
+          <p className="text-sm text-slate-600">Get an email when one of your reports changes status.</p>
+          {error && (
+            <p role="alert" className="mt-1 text-sm text-red-700">
+              {error}
+            </p>
+          )}
+        </div>
       </div>
-      <label className="relative inline-flex cursor-pointer items-center">
-        <input
-          type="checkbox"
-          checked={on}
-          disabled={busy}
-          onChange={(e) => change(e.target.checked)}
-          className="peer sr-only"
-          aria-label="Email updates"
-        />
-        <span className="h-6 w-11 rounded-full bg-slate-300 transition peer-checked:bg-ink-600 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink-600 peer-disabled:opacity-60" />
-        <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
-      </label>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-labelledby="email-updates-label"
+        disabled={busy}
+        onClick={() => change(!on)}
+        className={`relative h-7 w-12 flex-none rounded-full transition-colors disabled:opacity-60 ${on ? "bg-ink-700" : "bg-slate-300"}`}
+      >
+        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : ""}`} aria-hidden />
+      </button>
     </div>
   );
 }

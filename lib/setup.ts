@@ -163,6 +163,9 @@ export async function ensureMigrated(pool: Pool, log: Log = console.log): Promis
   const client = await pool.connect();
   try {
     await client.query("SELECT pg_advisory_lock($1)", [SETUP_LOCK]);
+    // Same as ensureDatabaseReady: on a fresh database the schema does not exist yet, and every
+    // migration would fail with "no schema has been selected to create in".
+    await client.query(`CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA}`);
     return await runMigrations(client, log);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [SETUP_LOCK]).catch(() => {});

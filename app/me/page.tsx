@@ -1,66 +1,76 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import MyReportsList from "@/components/MyReportsList";
 import NotificationToggle from "@/components/NotificationToggle";
-import StatusBadge from "@/components/StatusBadge";
+import EmptyState from "@/components/ui/EmptyState";
+import Icon from "@/components/ui/Icon";
+import PageHeader from "@/components/ui/PageHeader";
+import StatCard from "@/components/ui/StatCard";
 import { query } from "@/lib/db";
-import { mailEnabled } from "@/lib/mail";
-import { formatDate } from "@/lib/format";
-import { getPoints, listUserReports } from "@/lib/reports";
 import { requirePageRole } from "@/lib/guards";
-import { isPublicStatus } from "@/lib/status";
+import { mailEnabled } from "@/lib/mail";
+import { getPoints, listUserReports } from "@/lib/reports";
+import type { Status } from "@/lib/status";
 
 export const metadata: Metadata = { title: "My reports" };
 
 export default async function MyReportsPage() {
   const session = await requirePageRole("/me");
-  const reports = await listUserReports(session.userId);
-  const points = await getPoints(session.userId);
-  const [prefs] = mailEnabled()
-    ? await query<{ email_notifications: boolean }>("SELECT email_notifications FROM users WHERE id = $1", [session.userId])
-    : [];
+  const [reports, points, prefs] = await Promise.all([
+    listUserReports(session.userId),
+    getPoints(session.userId),
+    mailEnabled()
+      ? query<{ email_notifications: boolean }>("SELECT email_notifications FROM users WHERE id = $1", [session.userId]).then((r) => r[0])
+      : Promise.resolve(undefined),
+  ]);
+  const count = (...s: Status[]) => reports.filter((r) => s.includes(r.status)).length;
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">My reports</h1>
-          <p className="mt-1 text-sm text-slate-600">{points} points from resolved reports</p>
-        </div>
-        <Link href="/report/new" className="btn btn-primary">
-          New report
-        </Link>
+    <div className="container-page">
+      <PageHeader
+        eyebrow={`Signed in as ${session.name}`}
+        title="My reports"
+        description="Everything you have reported, and where each one stands."
+        actions={
+          <Link href="/report/new" className="btn btn-accent">
+            <Icon name="plus" className="h-4 w-4" />
+            Report an issue
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatCard label="Awaiting review" value={count("submitted", "under_review")} icon="clock" accent="#6d28d9" />
+        <StatCard label="Being fixed" value={count("verified", "in_progress")} icon="refresh" accent="#1d4ed8" />
+        <StatCard label="Resolved" value={count("resolved")} icon="check" accent="#15803d" />
+        <StatCard label="Points" value={points} hint="10 for each resolved report" icon="sparkle" accent="#9a3412" />
       </div>
 
-      {prefs && <NotificationToggle initial={prefs.email_notifications} />}
-
-      {reports.length === 0 ? (
-        <div className="card p-10 text-center">
-          <p className="text-slate-600">You have not reported anything yet.</p>
-          <Link href="/report/new" className="mt-4 inline-block font-semibold text-ink-700 hover:underline">
-            Report your first issue →
-          </Link>
+      {prefs && (
+        <div className="mt-6">
+          <NotificationToggle initial={prefs.email_notifications} />
         </div>
-      ) : (
-        <ul className="space-y-3">
-          {reports.map((r) => (
-            <li key={r.id} className="card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <Link href={`/reports/${r.id}`} className="font-semibold hover:text-ink-700">
-                  {r.title}
-                </Link>
-                <StatusBadge status={r.status} />
-              </div>
-              <p className="mt-1 text-xs text-slate-500">
-                {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · submitted {formatDate(r.createdAt)}
-                {!isPublicStatus(r.status) && r.status !== "rejected" && r.status !== "withdrawn" && r.status !== "duplicate" && (
-                  <> · not public yet</>
-                )}
-              </p>
-            </li>
-          ))}
-        </ul>
       )}
+
+      <section className="mt-8" aria-labelledby="list-title">
+        <h2 id="list-title" className="mb-3 text-lg font-semibold">
+          Your reports
+        </h2>
+        {reports.length === 0 ? (
+          <EmptyState
+            icon="pin"
+            title="You have not reported anything yet"
+            description="Seen a pothole, a broken streetlight or a clogged drain? Report it and follow it until it is fixed."
+            action={
+              <Link href="/report/new" className="btn btn-accent">
+                Report your first issue
+              </Link>
+            }
+          />
+        ) : (
+          <MyReportsList reports={reports} />
+        )}
+      </section>
     </div>
   );
 }

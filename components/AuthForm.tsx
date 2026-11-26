@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiError, safeNext } from "@/lib/client";
+import Alert from "./ui/Alert";
+import FormField from "./ui/FormField";
+import PasswordInput from "./ui/PasswordInput";
+import Spinner from "./ui/Spinner";
 
 interface ProviderLink {
   id: string;
@@ -74,82 +78,62 @@ export default function AuthForm({
   }
 
   return (
-    <div className="mx-auto w-full max-w-md px-4 py-12">
-      <div className="card p-6 shadow-sm">
-        <h1 className="text-2xl font-bold tracking-tight">{isLogin ? "Welcome back" : "Create your account"}</h1>
-        <p className="mt-1 text-sm text-slate-600">
-          {isLogin
-            ? "Log in to submit reports and follow their progress."
-            : "An account lets you submit reports and follow them until they are resolved."}
-        </p>
+    <>
+      {error && <Alert tone="danger" className="mt-5">{error}</Alert>}
 
-        {providers.length > 0 && (
-          <div className="mt-6 space-y-2">
-            {providers.map((p) => (
-              <a
-                key={p.id}
-                href={`/api/v1/auth/oauth/${p.id}${next ? `?next=${encodeURIComponent(target)}` : ""}`}
-                className="btn btn-secondary w-full"
-              >
-                <ProviderIcon id={p.id} />
-                Continue with {p.label}
-              </a>
-            ))}
-            <div className="flex items-center gap-3 pt-2 text-xs uppercase tracking-wide text-slate-400">
-              <span className="h-px flex-1 bg-slate-200" />
-              or use email
-              <span className="h-px flex-1 bg-slate-200" />
-            </div>
+      {providers.length > 0 && (
+        <div className="mt-6 space-y-2">
+          {providers.map((p) => (
+            <a key={p.id} href={`/api/v1/auth/oauth/${p.id}${next ? `?next=${encodeURIComponent(target)}` : ""}`} className="btn btn-secondary w-full">
+              <ProviderIcon id={p.id} />
+              Continue with {p.label}
+            </a>
+          ))}
+          <div className="flex items-center gap-3 pt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
+            <span className="h-px flex-1 bg-slate-200" />
+            or with email
+            <span className="h-px flex-1 bg-slate-200" />
           </div>
+        </div>
+      )}
+
+      <form onSubmit={onSubmit} className="mt-6 space-y-5">
+        {!isLogin && (
+          <FormField label="Full name" hint="Shown to city staff, never on the public map.">
+            <input name="name" required minLength={2} maxLength={80} autoComplete="name" className="field" />
+          </FormField>
         )}
-
-        <form onSubmit={onSubmit} className="mt-6 space-y-4">
-          {!isLogin && (
-            <label className="block text-sm font-medium">
-              Full name
-              <input name="name" required minLength={2} maxLength={80} autoComplete="name" className="field mt-1" />
-            </label>
+        <FormField label="Email">
+          <input name="email" type="email" required autoComplete="email" inputMode="email" className="field" />
+        </FormField>
+        <div>
+          <FormField label="Password" hint={isLogin ? undefined : "At least 8 characters. Avoid common passwords."}>
+            <PasswordInput name="password" required minLength={isLogin ? 1 : 8} maxLength={128} autoComplete={isLogin ? "current-password" : "new-password"} />
+          </FormField>
+          {isLogin && (
+            <Link href="/forgot-password" className="mt-2 inline-block text-sm font-semibold text-ink-700 hover:underline">
+              Forgot your password?
+            </Link>
           )}
-          <label className="block text-sm font-medium">
-            Email
-            <input name="email" type="email" required autoComplete="email" className="field mt-1" />
-          </label>
-          <label className="block text-sm font-medium">
-            Password
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={isLogin ? 1 : 8}
-              autoComplete={isLogin ? "current-password" : "new-password"}
-              className="field mt-1"
-            />
-            {!isLogin && <span className="mt-1 block text-xs font-normal text-slate-500">At least 8 characters.</span>}
-            {isLogin && (
-              <Link href="/forgot-password" className="mt-1 inline-block text-xs font-semibold text-ink-700 hover:underline">
-                Forgot your password?
-              </Link>
-            )}
-          </label>
+        </div>
 
-          {error && (
-            <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-              {error}
-            </p>
-          )}
+        <button type="submit" disabled={busy} className="btn btn-primary w-full">
+          {busy && <Spinner />}
+          {busy ? (isLogin ? "Logging in…" : "Creating account…") : isLogin ? "Log in" : "Create account"}
+        </button>
+        {!isLogin && (
+          <p className="text-xs text-slate-600">
+            By signing up you agree to the <Link href="/terms" className="link">terms of use</Link> and the <Link href="/privacy" className="link">privacy policy</Link>.
+          </p>
+        )}
+      </form>
 
-          <button type="submit" disabled={busy} className="btn btn-primary w-full">
-            {busy ? "Please wait…" : isLogin ? "Log in" : "Sign up"}
-          </button>
-        </form>
-
-        <p className="mt-5 text-center text-sm text-slate-600">
-          {isLogin ? "New here? " : "Already have an account? "}
-          <Link href={`${isLogin ? "/register" : "/login"}${nextQuery}`} className="font-semibold text-ink-700 hover:underline">
-            {isLogin ? "Create an account" : "Log in"}
-          </Link>
-        </p>
-      </div>
-    </div>
+      <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-600">
+        {isLogin ? "New to MunFix? " : "Already have an account? "}
+        <Link href={`${isLogin ? "/register" : "/login"}${nextQuery}`} className="link">
+          {isLogin ? "Create an account" : "Log in"}
+        </Link>
+      </p>
+    </>
   );
 }

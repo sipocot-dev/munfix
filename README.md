@@ -232,6 +232,7 @@ instrumentation.ts    Starts the email retry worker with the server
 - [docs/security.md](docs/security.md): sessions, passwords, rate limits, headers, known limitations
 - [docs/operations.md](docs/operations.md): deploy and rollback, migrations, backups and restore, incidents
 - [docs/claude-audit-report.md](docs/claude-audit-report.md): November 2026 full-stack audit
+- [docs/frontend-enhancement-report.md](docs/frontend-enhancement-report.md): design system (tokens, components in `components/ui/`), accessibility and UI changes
 
 ## Notes
 

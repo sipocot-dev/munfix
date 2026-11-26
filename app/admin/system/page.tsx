@@ -1,55 +1,79 @@
 import type { Metadata } from "next";
-import AdminNav from "@/components/AdminNav";
 import TestEmailButton from "@/components/TestEmailButton";
+import Alert from "@/components/ui/Alert";
+import PageHeader from "@/components/ui/PageHeader";
 import { requirePageRole } from "@/lib/guards";
 import { getSystemStatus } from "@/lib/system";
 
 export const metadata: Metadata = { title: "System" };
 
-function Dot({ ok }: { ok: boolean }) {
-  return <span className={`mr-2 inline-block h-2.5 w-2.5 rounded-full ${ok ? "bg-emerald-500" : "bg-red-500"}`} aria-label={ok ? "OK" : "Problem"} />;
+function State({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  return (
+    <p className="mt-2 flex items-start gap-2 text-sm text-slate-700">
+      <span className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${ok ? "bg-green-600" : "bg-red-600"}`} aria-hidden />
+      <span>
+        <span className={`font-semibold ${ok ? "text-green-800" : "text-red-800"}`}>{ok ? "Working" : "Problem"}</span> · {children}
+      </span>
+    </p>
+  );
 }
 
 export default async function SystemPage() {
-  const session = await requirePageRole("/admin/system", "admin");
+  await requirePageRole("/admin/system", "admin");
   const s = await getSystemStatus();
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8">
-      <h1 className="text-3xl font-bold tracking-tight">System</h1>
-      <p className="mt-2 mb-4 text-slate-600">Health of the services MunFix depends on, and what is configured.</p>
-      <AdminNav role={session.role} current="/admin/system" />
+    <>
+      <PageHeader title="System" description="Health of the services MunFix depends on, and what is configured. Read-only: settings are changed in the hosting environment." />
 
       {(s.adminsWithTempPassword > 0 || s.demoAccounts > 0) && (
-        <div role="alert" className="mb-6 space-y-1 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          {s.adminsWithTempPassword > 0 && <p>{s.adminsWithTempPassword} administrator account(s) still use a temporary password and have never set their own.</p>}
-          {s.demoAccounts > 0 && <p>{s.demoAccounts} demo account(s) (@munfix.local) exist. Deactivate them on the Users page before going live.</p>}
-        </div>
+        <Alert tone="warning" className="mb-6" live={false} title="Before going live">
+          <ul className="list-disc space-y-1 pl-5">
+            {s.adminsWithTempPassword > 0 && <li>{s.adminsWithTempPassword} administrator account(s) still use a temporary password.</li>}
+            {s.demoAccounts > 0 && <li>{s.demoAccounts} demo account(s) (@munfix.local) exist. Deactivate them on the Users page.</li>}
+          </ul>
+        </Alert>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <section className="card p-5"><h2 className="font-semibold">PostgreSQL</h2><p className="mt-1 text-sm"><Dot ok={s.database.ok} />{s.database.detail}</p></section>
-        <section className="card p-5"><h2 className="font-semibold">Redis</h2><p className="mt-1 text-sm"><Dot ok={s.redis.ok} />{s.redis.detail}</p></section>
-        <section className="card p-5"><h2 className="font-semibold">Photo storage</h2><p className="mt-1 text-sm">{s.storage.driver}: {s.storage.detail}</p></section>
+        <section className="card p-5">
+          <h2 className="font-semibold">Database (PostgreSQL)</h2>
+          <State ok={s.database.ok}>{s.database.detail}</State>
+        </section>
+        <section className="card p-5">
+          <h2 className="font-semibold">Sessions and cache (Redis)</h2>
+          <State ok={s.redis.ok}>{s.redis.detail}</State>
+        </section>
+        <section className="card p-5">
+          <h2 className="font-semibold">Photo storage</h2>
+          <p className="mt-2 text-sm text-slate-700">
+            <span className="font-semibold">{s.storage.driver}</span> · {s.storage.detail}
+          </p>
+        </section>
         <section className="card space-y-3 p-5">
           <h2 className="font-semibold">Email</h2>
-          <p className="text-sm"><Dot ok={s.mail.enabled} />{s.mail.enabled ? `Configured · ${s.mail.pending} pending · ${s.mail.failed} gave up` : "Not configured (set SMTP_URL and MAIL_FROM). Password reset and status emails are off."}</p>
+          <State ok={s.mail.enabled}>
+            {s.mail.enabled ? `${s.mail.pending} waiting to send · ${s.mail.failed} gave up` : "Not configured (set SMTP_URL and MAIL_FROM). Password reset and status emails are off."}
+          </State>
           {s.mail.enabled && <TestEmailButton />}
         </section>
       </div>
 
-      <section className="card mt-6 p-5">
+      <section className="card mt-6 p-5 sm:p-6">
         <h2 className="text-lg font-semibold">Social sign-in</h2>
-        <p className="mt-1 text-sm text-slate-600">Public site address: <code>{s.appUrl}</code>. Add these exact redirect URIs in each provider&apos;s console.</p>
-        <ul className="mt-3 space-y-3 text-sm">
+        <p className="mt-1 text-sm text-slate-600">
+          Public site address: <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px]">{s.appUrl}</code>. Register these exact redirect URIs in each provider&apos;s console.
+        </p>
+        <ul className="mt-4 divide-y divide-slate-100">
           {s.providers.map((p) => (
-            <li key={p.id}>
-              <p className="font-semibold capitalize"><Dot ok={p.configured} />{p.id} — {p.configured ? "credentials set, button visible on the login page" : "not configured (button hidden)"}</p>
-              <code className="mt-1 block break-all rounded bg-slate-100 px-2 py-1">{p.redirectUri}</code>
+            <li key={p.id} className="py-3 first:pt-0 last:pb-0">
+              <p className="font-semibold capitalize">{p.id}</p>
+              <State ok={p.configured}>{p.configured ? "Credentials set; the button shows on the log in page." : "Not configured; the button is hidden."}</State>
+              <code className="mt-2 block break-all rounded bg-slate-100 px-2 py-1.5 text-[13px]">{p.redirectUri}</code>
             </li>
           ))}
         </ul>
       </section>
-    </div>
+    </>
   );
 }

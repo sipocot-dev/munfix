@@ -1,183 +1,420 @@
-@import url("https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
-/* Civic palette: ink navy for the brand, signal orange for "report", map paper behind everything. */
+/*
+ * MunFix design tokens. Ink navy is the institution (navigation, primary actions, focus); signal orange is
+ * reserved for the one civic call to action, "Report an issue". Status colours live in lib/status.ts.
+ * Every text/background pair below meets WCAG 2.2 AA (4.5:1) at body size. See docs/frontend-enhancement-report.md.
+ */
 @theme {
-  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
+
   --color-ink-50: #eef2f7;
+  --color-ink-100: #dce4ee;
+  --color-ink-200: #b9c8db;
+  --color-ink-300: #8aa2c0;
+  --color-ink-400: #5c7ba0;
+  --color-ink-500: #3d5f86;
   --color-ink-600: #2c4a6e;
   --color-ink-700: #1d3557;
   --color-ink-800: #142740;
   --color-ink-900: #0c1a2e;
+
+  --color-signal-50: #fff4ed;
+  --color-signal-100: #ffe4d1;
+  --color-signal-600: #c2410c;
+  --color-signal-700: #9a3412;
+
+  --color-canvas: #f5f7fa;
+
+  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.08);
+  --shadow-raised: 0 12px 32px rgb(15 23 42 / 0.16);
 }
 
-/* One floating-control surface for search, filters, legend and map buttons. */
-.panel {
-  background: white;
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.08);
+@layer base {
+  html {
+    color-scheme: light;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-slate-900);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* One focus ring everywhere, keyboard only. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink-600);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-ink-100);
+  }
+  [hidden] {
+    display: none !important;
+  }
 }
 
-html {
-  color-scheme: light;
+@layer components {
+  /* Layout */
+  .container-page {
+    margin-inline: auto;
+    width: 100%;
+    max-width: 72rem;
+    padding: 2rem 1rem 3rem;
+  }
+  @media (min-width: 640px) {
+    .container-page {
+      padding-inline: 1.5rem;
+    }
+  }
+  .container-narrow {
+    max-width: 48rem;
+  }
+
+  /* Surfaces */
+  .card {
+    background: white;
+    border: 1px solid var(--color-slate-200);
+    border-radius: 0.625rem;
+  }
+  .panel {
+    background: white;
+    border-radius: 0.625rem;
+    box-shadow: var(--shadow-panel);
+  }
+
+  /* Text */
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--color-slate-600); /* slate-500 is 4.43:1 on the canvas, just under AA */
+  }
+  .link {
+    font-weight: 600;
+    color: var(--color-ink-700);
+    text-decoration: underline;
+    text-decoration-color: var(--color-ink-200);
+    text-underline-offset: 3px;
+  }
+  .link:hover {
+    text-decoration-color: currentColor;
+  }
+
+  /* Forms */
+  .label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-slate-800);
+  }
+  .hint {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--color-slate-600);
+  }
+  .field {
+    display: block;
+    width: 100%;
+    min-height: 2.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--color-slate-300);
+    background: white;
+    padding: 0.55rem 0.75rem;
+    font-size: 1rem; /* 16px stops iOS zooming into focused fields */
+    color: var(--color-slate-900);
+    transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  @media (min-width: 640px) {
+    .field {
+      font-size: 0.9375rem;
+    }
+  }
+  .field::placeholder {
+    color: var(--color-slate-400);
+  }
+  .field:hover:not(:disabled) {
+    border-color: var(--color-slate-400);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--color-ink-600);
+    box-shadow: 0 0 0 3px rgb(44 74 110 / 0.2);
+  }
+  .field:disabled {
+    background: var(--color-slate-50);
+    color: var(--color-slate-500);
+  }
+  .field[aria-invalid="true"] {
+    border-color: var(--color-red-600);
+  }
+
+  /* Buttons */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 2.75rem;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    padding: 0.5rem 1rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.25;
+    white-space: nowrap;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+    cursor: pointer;
+  }
+  .btn-sm {
+    min-height: 2.25rem;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  .btn-primary {
+    background: var(--color-ink-700);
+    color: white;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--color-ink-800);
+  }
+  .btn-accent {
+    background: var(--color-signal-600);
+    color: white;
+  }
+  .btn-accent:hover:not(:disabled) {
+    background: var(--color-signal-700);
+  }
+  .btn-secondary {
+    background: white;
+    color: var(--color-slate-800);
+    border-color: var(--color-slate-300);
+  }
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-slate-50);
+    border-color: var(--color-slate-400);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--color-slate-700);
+  }
+  .btn-ghost:hover:not(:disabled) {
+    background: var(--color-slate-100);
+  }
+  .btn-danger {
+    background: white;
+    color: var(--color-red-700);
+    border-color: var(--color-red-200);
+  }
+  .btn-danger:hover:not(:disabled) {
+    background: var(--color-red-50);
+    border-color: var(--color-red-300);
+  }
+  .btn-danger-solid {
+    background: var(--color-red-700);
+    color: white;
+  }
+  .btn-danger-solid:hover:not(:disabled) {
+    background: var(--color-red-800);
+  }
+
+  /* Choice chips (filters). Pressed state comes from aria-pressed so the markup stays accessible. */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 2.25rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-slate-300);
+    background: white;
+    padding: 0.3rem 0.8rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-slate-700);
+    transition: background-color 0.15s, border-color 0.15s;
+  }
+  .chip:hover {
+    border-color: var(--color-slate-400);
+  }
+  .chip[aria-pressed="true"],
+  .chip[aria-current="true"] {
+    border-color: var(--color-ink-700);
+    background: var(--color-ink-50);
+    color: var(--color-ink-900);
+    font-weight: 600;
+  }
+
+  /* Loading placeholders */
+  .skeleton {
+    border-radius: 0.375rem;
+    background: linear-gradient(90deg, var(--color-slate-200) 0%, var(--color-slate-100) 50%, var(--color-slate-200) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+  }
+
+  /* Long-form text: privacy, terms, data deletion, about. */
+  .prose-civic {
+    color: var(--color-slate-700);
+    line-height: 1.7;
+  }
+  .prose-civic > * + * {
+    margin-top: 1rem;
+  }
+  .prose-civic h2 {
+    margin-top: 2rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--color-slate-900);
+  }
+  .prose-civic ul {
+    list-style: disc;
+    padding-left: 1.5rem;
+  }
+  .prose-civic ol {
+    list-style: decimal;
+    padding-left: 1.5rem;
+  }
+  .prose-civic li + li {
+    margin-top: 0.35rem;
+  }
+  .prose-civic a {
+    font-weight: 600;
+    color: var(--color-ink-700);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .prose-civic strong {
+    color: var(--color-slate-900);
+  }
 }
 
-body {
-  background: #f8fafc;
-  color: #0f172a;
-  -webkit-font-smoothing: antialiased;
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
 }
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.2s ease-out both;
+}
+
+/* ----------------------------- Map ----------------------------- */
 
 .maplibregl-popup-content {
   border-radius: 10px;
-  padding: 10px 12px;
+  padding: 0;
   font-family: inherit;
-  box-shadow: 0 6px 20px rgb(15 23 42 / 0.18);
+  box-shadow: var(--shadow-raised);
+  overflow: hidden;
 }
 .maplibregl-popup-close-button {
-  font-size: 18px;
-  padding: 0 6px;
+  width: 2rem;
+  height: 2rem;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--color-slate-700);
+  background: rgb(255 255 255 / 0.9);
+  border-radius: 0 10px 0 8px;
+  z-index: 1;
+}
+.maplibregl-ctrl-attrib {
+  font-size: 11px;
 }
 
-.field {
-  display: block;
-  width: 100%;
-  border-radius: 0.5rem;
-  border: 1px solid #cbd5e1;
-  background: white;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.925rem;
-}
-.field:focus {
-  outline: 2px solid #0f766e;
-  outline-offset: 1px;
-  border-color: #0f766e;
-}
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  border-radius: 0.5rem;
-  padding: 0.55rem 1rem;
-  font-size: 0.925rem;
-  font-weight: 600;
-  transition: background-color 0.15s;
-}
-.btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.btn-primary {
-  background: #0f766e;
-  color: white;
-}
-.btn-primary:hover:not(:disabled) {
-  background: #115e59;
-}
-.btn-secondary {
-  background: white;
-  color: #0f172a;
-  border: 1px solid #cbd5e1;
-}
-.btn-secondary:hover:not(:disabled) {
-  background: #f1f5f9;
-}
-.btn-danger {
-  background: white;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
-}
-.btn-danger:hover:not(:disabled) {
-  background: #fef2f2;
-}
-.card {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 0.75rem;
-}
-
-/* Map pins. Motion goes on the inner svg and pseudo-elements only: MapLibre sets transform on the marker root. */
+/* Map pins. Motion goes on the inner svg only: MapLibre sets transform on the marker root. */
 @keyframes pin-drop {
-  0% { opacity: 0; transform: translateY(-16px) scale(0.6); }
-  60% { opacity: 1; transform: translateY(3px) scale(1.04); }
-  100% { transform: none; }
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.7);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(2px);
+  }
+  100% {
+    transform: none;
+  }
 }
 @keyframes pin-pulse {
-  0% { opacity: 0.7; transform: scale(0.4); }
-  100% { opacity: 0; transform: scale(1.9); }
+  0% {
+    opacity: 0.6;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
 }
-@keyframes card-in {
-  from { opacity: 0; transform: translate(-50%, 4px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
-}
-/* Hover and press use the individual translate/rotate/scale properties, so they do not fight the drop and launch transform animations. */
 .pin-svg {
-  animation: pin-drop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-  transition: translate 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), rotate 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), scale 0.15s ease-out, transform 0.2s ease-out;
+  animation: pin-drop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: translate 0.2s ease-out, scale 0.15s ease-out;
 }
-.pin:hover .pin-svg {
-  translate: 0 -4px;
-  rotate: -7deg;
+.pin[data-quiet] .pin-svg {
+  animation: none;
+}
+.pin:hover .pin-svg,
+.pin:focus-visible .pin-svg {
+  translate: 0 -3px;
 }
 .pin:active .pin-svg {
-  scale: 0.88;
+  scale: 0.92;
+}
+.pin[data-hover="1"] .pin-svg {
+  translate: 0 -4px;
+  scale: 1.12;
 }
 .pin[data-selected="1"] .pin-svg {
-  transform: scale(1.25);
+  scale: 1.2;
 }
 .pin[data-selected="1"]::before {
   content: "";
   position: absolute;
   left: 0;
   bottom: 0;
-  width: 34px;
+  width: 32px;
   height: 12px;
   border-radius: 50%;
   background: rgb(29 53 87 / 0.45);
   z-index: -1;
   animation: pin-pulse 1.6s ease-out infinite;
 }
-.pin-card {
-  animation: card-in 0.18s ease-out;
+.pin:focus-visible {
+  outline-offset: 0;
+  border-radius: 6px;
 }
-/* Click: the pin lifts off, a shock ring spreads, and the other pins fade while the map flies in. */
-@keyframes pin-launch {
-  0% { transform: translateY(0) scale(1); }
-  30% { transform: translateY(-10px) scale(1.2); }
-  100% { transform: translateY(-140px) scale(0.35); opacity: 0; }
+.cluster {
+  transition: scale 0.15s ease-out;
 }
-@keyframes pin-shock {
-  from { transform: scale(0.5); opacity: 1; }
-  to { transform: scale(7); opacity: 0; }
+.cluster:hover {
+  scale: 1.08;
 }
-.pin.pin-launch .pin-svg {
-  animation: pin-launch 0.9s cubic-bezier(0.5, 0, 0.8, 0.4) forwards;
-}
-.pin.pin-launch::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 34px;
-  height: 12px;
-  border: 2px solid rgb(29 53 87 / 0.7);
-  border-radius: 50%;
-  animation: pin-shock 0.9s ease-out forwards;
-}
-.pin.pin-launch .pin-card {
-  display: none !important; /* beats the inline display set on hover */
-}
-.map-launching .pin:not(.pin-launch) {
-  opacity: 0.25;
-  transition: opacity 0.4s ease-out;
-}
+
 @media (prefers-reduced-motion: reduce) {
-  .pin-svg,
-  .pin-card,
-  .pin[data-selected="1"]::before,
-  .pin.pin-launch::after {
-    animation: none;
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

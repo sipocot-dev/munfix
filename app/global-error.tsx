@@ -9,11 +9,11 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
         <p style={{ color: "#475569" }}>We could not load MunFix. Please try again in a moment.</p>
         <button
           onClick={reset}
-          style={{ marginTop: "1rem", padding: "0.6rem 1.2rem", borderRadius: 8, border: 0, background: "#1d3557", color: "white", fontWeight: 600 }}
+          style={{ marginTop: "1rem", padding: "0.6rem 1.2rem", borderRadius: 8, border: 0, background: "#1d3557", color: "white", fontWeight: 600, fontSize: 16, cursor: "pointer", minHeight: 44 }}
         >
           Try again
         </button>
-        {error.digest && <p style={{ marginTop: "1.5rem", fontSize: 12, color: "#94a3b8" }}>Reference: {error.digest}</p>}
+        {error.digest && <p style={{ marginTop: "1.5rem", fontSize: 12, color: "#475569" }}>Reference: {error.digest}</p>}
       </body>
     </html>
   );
