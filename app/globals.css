@@ -3,11 +3,19 @@
 /*
  * MunFix design tokens. Ink navy is the institution (navigation, primary actions, focus); signal orange is
  * reserved for the one civic call to action, "Report an issue". Status colours live in lib/status.ts.
- * Every text/background pair below meets WCAG 2.2 AA (4.5:1) at body size. See docs/frontend-enhancement-report.md.
+ *
+ * Components use the semantic tokens below (surface, fg, line, accent, tone colours), never raw palette
+ * steps, so one definition per theme is all dark mode needs. Light values are the defaults; dark values
+ * apply when <html data-theme="dark"> (set before first paint by the script in app/layout.tsx), or, with
+ * scripts off, when the operating system prefers dark. Every pair meets WCAG 2.2 AA; see
+ * tests/unit/design-system.test.ts.
  */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
   --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, sans-serif;
 
+  /* Brand ramp (fixed in both themes) */
   --color-ink-50: #eef2f7;
   --color-ink-100: #dce4ee;
   --color-ink-200: #b9c8db;
@@ -18,16 +26,72 @@
   --color-ink-700: #1d3557;
   --color-ink-800: #142740;
   --color-ink-900: #0c1a2e;
-
   --color-signal-50: #fff4ed;
   --color-signal-100: #ffe4d1;
   --color-signal-600: #c2410c;
   --color-signal-700: #9a3412;
 
+  /* Semantic tokens: light values */
   --color-canvas: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-surface-2: #f8fafc;
+  --color-surface-3: #eef2f6;
+  --color-fg: #0f172a;
+  --color-fg-muted: #45556c;
+  --color-fg-subtle: #62748e;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-accent: #1d3557;
+  --color-accent-strong: #142740;
+  --color-accent-soft: #eef2f7;
+  --color-primary: #1d3557;
+  --color-primary-hover: #142740;
+  --color-focus: #2c4a6e;
+  --color-chart: #2c4a6e;
+  --color-danger: #b91c1c;
+  --color-danger-soft: #fef2f2;
+  --color-danger-line: #fecaca;
+  --color-warning: #78350f;
+  --color-warning-soft: #fffbeb;
+  --color-warning-line: #fcd34d;
+  --color-success: #166534;
+  --color-success-soft: #f0fdf4;
+  --color-success-line: #bbf7d0;
 
   --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.08);
   --shadow-raised: 0 12px 32px rgb(15 23 42 / 0.16);
+}
+
+/* Dark: the ink ramp turned down, not grey-black, so the product keeps its navy character at night. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-canvas: #0d1726;
+  --color-surface: #132036;
+  --color-surface-2: #172740;
+  --color-surface-3: #1f324f;
+  --color-fg: #e6ecf3;
+  --color-fg-muted: #b4c1d2;
+  --color-fg-subtle: #8b9bb0;
+  --color-line: #263a58;
+  --color-line-strong: #3a5277;
+  --color-accent: #a9c1e0;
+  --color-accent-strong: #d4e1f1;
+  --color-accent-soft: #1b2d4a;
+  --color-primary: #2f5d95;
+  --color-primary-hover: #3b6aa5;
+  --color-focus: #8fb0dd;
+  --color-chart: #7ea3d4;
+  --color-danger: #fca5a5;
+  --color-danger-soft: #3a1318;
+  --color-danger-line: #7f1d1d;
+  --color-warning: #fcd34d;
+  --color-warning-soft: #33260b;
+  --color-warning-line: #78501a;
+  --color-success: #86efac;
+  --color-success-soft: #0f2e1d;
+  --color-success-line: #166534;
+  --shadow-panel: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.35);
+  --shadow-raised: 0 12px 32px rgb(0 0 0 / 0.5);
 }
 
 @layer base {
@@ -37,16 +101,16 @@
   }
   body {
     background: var(--color-canvas);
-    color: var(--color-slate-900);
+    color: var(--color-fg);
     -webkit-font-smoothing: antialiased;
   }
   /* One focus ring everywhere, keyboard only. */
   :focus-visible {
-    outline: 2px solid var(--color-ink-600);
+    outline: 2px solid var(--color-focus);
     outline-offset: 2px;
   }
   ::selection {
-    background: var(--color-ink-100);
+    background: var(--color-accent-soft);
   }
   [hidden] {
     display: none !important;
@@ -72,29 +136,27 @@
 
   /* Surfaces */
   .card {
-    background: white;
-    border: 1px solid var(--color-slate-200);
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
     border-radius: 0.625rem;
   }
   .panel {
-    background: white;
+    background: var(--color-surface);
     border-radius: 0.625rem;
     box-shadow: var(--shadow-panel);
   }
 
-  /* Text */
+  /* Text. The small heading above a block is sentence case: no tracked capitals. */
   .eyebrow {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-weight: 600;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: var(--color-slate-600); /* slate-500 is 4.43:1 on the canvas, just under AA */
+    color: var(--color-fg-muted);
   }
   .link {
     font-weight: 600;
-    color: var(--color-ink-700);
+    color: var(--color-accent);
     text-decoration: underline;
-    text-decoration-color: var(--color-ink-200);
+    text-decoration-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
     text-underline-offset: 3px;
   }
   .link:hover {
@@ -106,25 +168,25 @@
     display: block;
     font-size: 0.875rem;
     font-weight: 600;
-    color: var(--color-slate-800);
+    color: var(--color-fg);
   }
   .hint {
     display: block;
     margin-top: 0.25rem;
     font-size: 0.8125rem;
     font-weight: 400;
-    color: var(--color-slate-600);
+    color: var(--color-fg-muted);
   }
   .field {
     display: block;
     width: 100%;
     min-height: 2.75rem;
     border-radius: 0.5rem;
-    border: 1px solid var(--color-slate-300);
-    background: white;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
     padding: 0.55rem 0.75rem;
     font-size: 1rem; /* 16px stops iOS zooming into focused fields */
-    color: var(--color-slate-900);
+    color: var(--color-fg);
     transition: border-color 0.15s, box-shadow 0.15s;
   }
   @media (min-width: 640px) {
@@ -133,22 +195,22 @@
     }
   }
   .field::placeholder {
-    color: var(--color-slate-400);
+    color: var(--color-fg-subtle);
   }
   .field:hover:not(:disabled) {
-    border-color: var(--color-slate-400);
+    border-color: var(--color-fg-subtle);
   }
   .field:focus {
     outline: none;
-    border-color: var(--color-ink-600);
-    box-shadow: 0 0 0 3px rgb(44 74 110 / 0.2);
+    border-color: var(--color-focus);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 25%, transparent);
   }
   .field:disabled {
-    background: var(--color-slate-50);
-    color: var(--color-slate-500);
+    background: var(--color-surface-2);
+    color: var(--color-fg-muted);
   }
   .field[aria-invalid="true"] {
-    border-color: var(--color-red-600);
+    border-color: var(--color-danger);
   }
 
   /* Buttons */
@@ -179,11 +241,11 @@
     cursor: not-allowed;
   }
   .btn-primary {
-    background: var(--color-ink-700);
+    background: var(--color-primary);
     color: white;
   }
   .btn-primary:hover:not(:disabled) {
-    background: var(--color-ink-800);
+    background: var(--color-primary-hover);
   }
   .btn-accent {
     background: var(--color-signal-600);
@@ -193,36 +255,36 @@
     background: var(--color-signal-700);
   }
   .btn-secondary {
-    background: white;
-    color: var(--color-slate-800);
-    border-color: var(--color-slate-300);
+    background: var(--color-surface);
+    color: var(--color-fg);
+    border-color: var(--color-line-strong);
   }
   .btn-secondary:hover:not(:disabled) {
-    background: var(--color-slate-50);
-    border-color: var(--color-slate-400);
+    background: var(--color-surface-2);
+    border-color: var(--color-fg-subtle);
   }
   .btn-ghost {
     background: transparent;
-    color: var(--color-slate-700);
+    color: var(--color-fg-muted);
   }
   .btn-ghost:hover:not(:disabled) {
-    background: var(--color-slate-100);
+    background: var(--color-surface-3);
+    color: var(--color-fg);
   }
   .btn-danger {
-    background: white;
-    color: var(--color-red-700);
-    border-color: var(--color-red-200);
+    background: var(--color-surface);
+    color: var(--color-danger);
+    border-color: var(--color-danger-line);
   }
   .btn-danger:hover:not(:disabled) {
-    background: var(--color-red-50);
-    border-color: var(--color-red-300);
+    background: var(--color-danger-soft);
   }
   .btn-danger-solid {
-    background: var(--color-red-700);
+    background: #b91c1c;
     color: white;
   }
   .btn-danger-solid:hover:not(:disabled) {
-    background: var(--color-red-800);
+    background: #991b1b;
   }
 
   /* Choice chips (filters). Pressed state comes from aria-pressed so the markup stays accessible. */
@@ -232,36 +294,54 @@
     gap: 0.4rem;
     min-height: 2.25rem;
     border-radius: 999px;
-    border: 1px solid var(--color-slate-300);
-    background: white;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
     padding: 0.3rem 0.8rem;
     font-size: 0.875rem;
     font-weight: 500;
-    color: var(--color-slate-700);
+    color: var(--color-fg-muted);
     transition: background-color 0.15s, border-color 0.15s;
   }
   .chip:hover {
-    border-color: var(--color-slate-400);
+    border-color: var(--color-fg-subtle);
   }
   .chip[aria-pressed="true"],
   .chip[aria-current="true"] {
-    border-color: var(--color-ink-700);
-    background: var(--color-ink-50);
-    color: var(--color-ink-900);
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent-strong);
     font-weight: 600;
+  }
+
+  /* Status text: light and dark shades come from lib/status.ts as --st / --st-d (StatusBadge, map previews). */
+  .status-text {
+    color: var(--st);
+  }
+  [data-theme="dark"] .status-text {
+    color: var(--st-d);
+  }
+
+  /* Accent-coloured icon chip (StatCard): --c is a mid-tone; dark mode lifts it toward white for contrast. */
+  .tone-icon {
+    color: var(--c);
+    background: color-mix(in srgb, var(--c) 10%, transparent);
+  }
+  [data-theme="dark"] .tone-icon {
+    color: color-mix(in srgb, var(--c) 40%, white);
+    background: color-mix(in srgb, var(--c) 25%, transparent);
   }
 
   /* Loading placeholders */
   .skeleton {
     border-radius: 0.375rem;
-    background: linear-gradient(90deg, var(--color-slate-200) 0%, var(--color-slate-100) 50%, var(--color-slate-200) 100%);
+    background: linear-gradient(90deg, var(--color-surface-3) 0%, var(--color-surface-2) 50%, var(--color-surface-3) 100%);
     background-size: 200% 100%;
     animation: shimmer 1.4s ease-in-out infinite;
   }
 
   /* Long-form text: privacy, terms, data deletion, about. */
   .prose-civic {
-    color: var(--color-slate-700);
+    color: var(--color-fg-muted);
     line-height: 1.7;
   }
   .prose-civic > * + * {
@@ -271,7 +351,7 @@
     margin-top: 2rem;
     font-size: 1.25rem;
     font-weight: 700;
-    color: var(--color-slate-900);
+    color: var(--color-fg);
   }
   .prose-civic ul {
     list-style: disc;
@@ -286,12 +366,12 @@
   }
   .prose-civic a {
     font-weight: 600;
-    color: var(--color-ink-700);
+    color: var(--color-accent);
     text-decoration: underline;
     text-underline-offset: 3px;
   }
   .prose-civic strong {
-    color: var(--color-slate-900);
+    color: var(--color-fg);
   }
 }
 
@@ -323,21 +403,53 @@
   border-radius: 10px;
   padding: 0;
   font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-fg);
   box-shadow: var(--shadow-raised);
   overflow: hidden;
+}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--color-surface);
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--color-surface);
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--color-surface);
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--color-surface);
 }
 .maplibregl-popup-close-button {
   width: 2rem;
   height: 2rem;
   font-size: 20px;
   line-height: 1;
-  color: var(--color-slate-700);
-  background: rgb(255 255 255 / 0.9);
+  color: var(--color-fg-muted);
+  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
   border-radius: 0 10px 0 8px;
   z-index: 1;
 }
 .maplibregl-ctrl-attrib {
   font-size: 11px;
+}
+/* Attribution and built-in controls follow the theme, so they stay readable over a dark basemap. */
+.maplibregl-ctrl-attrib,
+.maplibregl-ctrl-attrib.maplibregl-compact,
+.maplibregl-ctrl-group {
+  background: color-mix(in srgb, var(--color-surface) 92%, transparent);
+  color: var(--color-fg-muted);
+}
+.maplibregl-ctrl-attrib a {
+  color: var(--color-fg-muted);
+}
+[data-theme="dark"] .maplibregl-ctrl-attrib-button,
+[data-theme="dark"] .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
 }
 
 /* Map pins. Motion goes on the inner svg only: MapLibre sets transform on the marker root. */
@@ -364,6 +476,25 @@
     transform: scale(1.9);
   }
 }
+/*
+ * Markers. MapLibre sets `transform` on every marker's root element to place it, so the root never gets
+ * transform, translate, rotate or scale here: individual transform properties are applied before
+ * `transform` and would scale the map offset too, making markers jump on hover. Motion and emphasis go on
+ * the inner .pin-svg / .cluster-disc; the root keeps a fixed size so the hit area never moves under the pointer.
+ */
+.pin,
+.cluster {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
 .pin-svg {
   animation: pin-drop 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   transition: translate 0.2s ease-out, scale 0.15s ease-out;
@@ -372,15 +503,12 @@
   animation: none;
 }
 .pin:hover .pin-svg,
-.pin:focus-visible .pin-svg {
-  translate: 0 -3px;
+.pin:focus-visible .pin-svg,
+.pin[data-hover="1"] .pin-svg {
+  translate: 0 -4px;
 }
 .pin:active .pin-svg {
   scale: 0.92;
-}
-.pin[data-hover="1"] .pin-svg {
-  translate: 0 -4px;
-  scale: 1.12;
 }
 .pin[data-selected="1"] .pin-svg {
   scale: 1.2;
@@ -397,15 +525,47 @@
   z-index: -1;
   animation: pin-pulse 1.6s ease-out infinite;
 }
-.pin:focus-visible {
-  outline-offset: 0;
-  border-radius: 6px;
+/* Raise the marker being pointed at or focused, so neighbours never cover it. */
+.pin:hover,
+.pin:focus-visible,
+.cluster:hover,
+.cluster:focus-visible {
+  z-index: 6 !important; /* beats the inline z-index set for selection */
 }
-.cluster {
-  transition: scale 0.15s ease-out;
+.pin:focus-visible,
+.cluster:focus-visible {
+  outline: none;
 }
-.cluster:hover {
+.pin:focus-visible .pin-svg {
+  filter: drop-shadow(0 0 0 #fff) drop-shadow(0 0 3px var(--color-focus));
+}
+.cluster-disc {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  box-shadow: 0 0 0 4px rgb(29 53 87 / 0.25), 0 2px 6px rgb(15 23 42 / 0.3);
+  transition: scale 0.15s ease-out, background-color 0.15s, box-shadow 0.15s;
+  pointer-events: none; /* the fixed-size root is the only hit target */
+}
+.cluster:hover .cluster-disc {
   scale: 1.08;
+  background: var(--color-primary-hover);
+}
+.cluster:active .cluster-disc {
+  scale: 0.95;
+}
+.cluster:focus-visible .cluster-disc {
+  box-shadow: 0 0 0 3px var(--color-surface), 0 0 0 6px var(--color-focus);
 }
 
 @media (prefers-reduced-motion: reduce) {

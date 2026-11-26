@@ -7,8 +7,8 @@ import type { Category, ReportSummary } from "@/lib/reports";
 import { iconPathFor } from "@/lib/categoryIcons";
 import { withinBounds } from "@/lib/config";
 import { formatDate } from "@/lib/format";
-import { createMap } from "@/lib/map";
-import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL, STATUS_TEXT } from "@/lib/status";
+import { BASEMAP_UNAVAILABLE, createMap } from "@/lib/map";
+import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL, STATUS_TEXT, STATUS_TEXT_DARK } from "@/lib/status";
 import Icon from "./ui/Icon";
 import { CategoryIcon } from "./ui/Icon";
 
@@ -53,14 +53,33 @@ function pinElement(r: ReportSummary, quiet: boolean): HTMLButtonElement {
   return el;
 }
 
-function clusterElement(count: number): HTMLButtonElement {
+/** Diameter for a cluster of `count` reports: bigger groups read as bigger, without covering half the map. */
+export function clusterSize(count: number): number {
+  return count < 10 ? 36 : count < 100 ? 44 : 52;
+}
+
+/** Short count for the bubble: 999 fits; larger numbers become "1.2k" (the full number is in the label). */
+export function clusterLabel(count: number): string {
+  return count < 1000 ? String(count) : `${(count / 1000).toFixed(count < 10_000 ? 1 : 0).replace(/\.0$/, "")}k`;
+}
+
+/**
+ * A cluster marker. MapLibre positions the root with `transform: translate(...)`, so the root itself must
+ * never change size or transform: CSS `scale` on it would also scale that translation and make the marker
+ * jump. All hover, focus and pressed styling happens on the inner disc (see .cluster in globals.css).
+ */
+export function clusterElement(count: number): HTMLButtonElement {
+  const size = clusterSize(count);
   const el = document.createElement("button");
   el.type = "button";
   el.className = "cluster";
-  const size = count < 10 ? 36 : count < 50 ? 44 : 52;
-  el.setAttribute("aria-label", `${count} reports in this area. Zoom in`);
-  el.style.cssText = `position:absolute;top:0;left:0;width:${size}px;height:${size}px;border-radius:50%;border:3px solid #fff;background:#1d3557;color:#fff;font-weight:700;font-size:${count < 100 ? 14 : 12}px;line-height:1;font-family:inherit;cursor:pointer;box-shadow:0 0 0 4px rgb(29 53 87 / .25),0 2px 6px rgb(15 23 42 / .3)`;
-  el.textContent = String(count);
+  el.setAttribute("aria-label", `${count} reports in this area. Zoom in to see them`);
+  el.style.cssText = `width:${size}px;height:${size}px`;
+  const disc = document.createElement("span");
+  disc.className = "cluster-disc";
+  disc.setAttribute("aria-hidden", "true");
+  disc.textContent = clusterLabel(count);
+  el.append(disc);
   return el;
 }
 
@@ -73,25 +92,26 @@ function previewNode(r: ReportSummary, open: (href: string) => void): HTMLElemen
     img.src = r.thumb;
     img.alt = "";
     img.loading = "lazy";
-    img.style.cssText = "display:block;width:100%;height:132px;object-fit:cover;background:#e2e8f0";
+    img.style.cssText = "display:block;width:100%;height:132px;object-fit:cover;background:var(--color-surface-3)";
     root.append(img);
   }
   const body = document.createElement("div");
   body.style.cssText = "padding:12px 14px 14px";
   const status = document.createElement("div");
   status.textContent = STATUS_LABEL[r.status];
-  status.style.cssText = `display:inline-block;font-size:12px;font-weight:700;color:${STATUS_TEXT[r.status]};background:${STATUS_COLOR[r.status]}1a;border-radius:999px;padding:2px 9px`;
+  status.className = "status-text";
+  status.style.cssText = `--st:${STATUS_TEXT[r.status]};--st-d:${STATUS_TEXT_DARK[r.status]};display:inline-block;font-size:12px;font-weight:700;background:${STATUS_COLOR[r.status]}1a;border-radius:999px;padding:2px 9px`;
   const title = document.createElement("div");
   title.textContent = r.title;
-  title.style.cssText = "font-weight:700;font-size:15px;line-height:1.3;margin:8px 0 4px;color:#0f172a";
+  title.style.cssText = "font-weight:700;font-size:15px;line-height:1.3;margin:8px 0 4px;color:var(--color-fg)";
   const meta = document.createElement("div");
   meta.textContent = [r.categoryName, r.problemType, r.barangay, `Reported ${formatDate(r.createdAt)}`].filter(Boolean).join(" · ");
-  meta.style.cssText = "font-size:13px;line-height:1.45;color:#475569;margin-bottom:12px";
+  meta.style.cssText = "font-size:13px;line-height:1.45;color:var(--color-fg-muted);margin-bottom:12px";
   const href = `/reports/${r.id}`;
   const link = document.createElement("a");
   link.href = href;
   link.textContent = "View report →";
-  link.style.cssText = "display:inline-flex;align-items:center;min-height:36px;background:#1d3557;color:#fff;padding:0 14px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none";
+  link.style.cssText = "display:inline-flex;align-items:center;min-height:36px;background:var(--color-primary);color:#fff;padding:0 14px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none";
   link.addEventListener("click", (e) => {
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
     e.preventDefault();
@@ -108,10 +128,10 @@ function reportHereNode(lng: number, lat: number): HTMLElement {
   root.style.cssText = "padding:12px 14px;min-width:210px";
   const head = document.createElement("div");
   head.textContent = inside ? "Report a problem here?" : "Outside the municipality";
-  head.style.cssText = "font-weight:700;color:#0f172a";
+  head.style.cssText = "font-weight:700;color:var(--color-fg)";
   const coords = document.createElement("div");
   coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-  coords.style.cssText = "font-size:12px;color:#475569;margin:2px 0 10px;font-variant-numeric:tabular-nums";
+  coords.style.cssText = "font-size:12px;color:var(--color-fg-muted);margin:2px 0 10px;font-variant-numeric:tabular-nums";
   root.append(head, coords);
   if (inside) {
     const a = document.createElement("a");
@@ -122,7 +142,7 @@ function reportHereNode(lng: number, lat: number): HTMLElement {
   } else {
     const note = document.createElement("div");
     note.textContent = "Reports can only be placed inside the municipality.";
-    note.style.cssText = "font-size:13px;color:#475569";
+    note.style.cssText = "font-size:13px;color:var(--color-fg-muted)";
     root.append(note);
   }
   return root;
@@ -142,7 +162,7 @@ function geoMessage(err: GeolocationPositionError): string {
 }
 
 const ctrl =
-  "grid h-11 w-11 place-items-center bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 disabled:opacity-50 aria-pressed:bg-ink-700 aria-pressed:text-white";
+  "grid h-11 w-11 place-items-center bg-surface text-fg-muted hover:bg-surface-2 hover:text-fg disabled:opacity-50 aria-pressed:bg-primary aria-pressed:text-white";
 
 /* ----------------------------- Component ----------------------------- */
 
@@ -233,7 +253,7 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
       if (!el.current) return;
       let map: MlMap;
       try {
-        map = await createMap(el.current, { controls: false, vector: true });
+        map = await createMap(el.current, { controls: false });
       } catch (err) {
         // No WebGL (old phones, some locked-down browsers): the list stays usable.
         console.error("[map] could not start:", err);
@@ -245,6 +265,8 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
         return;
       }
       mapRef.current = map;
+      // The tile service failed and the map switched to a plain background: say so (pins still work).
+      el.current!.addEventListener(BASEMAP_UNAVAILABLE, () => setTileErrors(99));
       // The map is display:none in the phone list view; redraw at the right size when it comes back.
       const resize = new ResizeObserver(() => map.resize());
       resize.observe(el.current!);
@@ -427,11 +449,11 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
 
   if (failed) {
     return (
-      <div className={`grid place-items-center bg-slate-100 p-6 text-center ${className ?? ""}`}>
+      <div className={`grid place-items-center bg-surface-3 p-6 text-center ${className ?? ""}`}>
         <div className="max-w-xs">
-          <Icon name="map" className="mx-auto h-8 w-8 text-slate-400" />
-          <p className="mt-3 font-semibold text-slate-800">The map cannot be shown on this device</p>
-          <p className="mt-1 text-sm text-slate-600">Every report is still in the list.</p>
+          <Icon name="map" className="mx-auto h-8 w-8 text-fg-subtle" />
+          <p className="mt-3 font-semibold text-fg">The map cannot be shown on this device</p>
+          <p className="mt-1 text-sm text-fg-muted">Every report is still in the list.</p>
         </div>
       </div>
     );
@@ -439,28 +461,28 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
 
   return (
     <div className={`relative overflow-hidden ${className ?? ""}`}>
-      <div ref={el} className="h-full w-full bg-[#e8ecef]" role="region" aria-label="Map of reported issues. Use the list for a keyboard-friendly view." />
+      <div ref={el} className="h-full w-full bg-surface-3" role="region" aria-label="Map of reported issues. Use the list for a keyboard-friendly view." />
 
       {!ready && (
-        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-[#e8ecef]" role="status">
-          <span className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-[var(--shadow-panel)]">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-200 border-t-ink-700" aria-hidden />
+        <div className="pointer-events-none absolute inset-0 grid place-items-center bg-surface-3" role="status">
+          <span className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-sm font-medium text-fg-muted shadow-[var(--shadow-panel)]">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-primary" aria-hidden />
             Loading map…
           </span>
         </div>
       )}
 
       {tileErrors >= 3 && (
-        <p role="status" className="absolute left-1/2 top-3 max-w-[calc(100%-6rem)] -translate-x-1/2 rounded-lg bg-white/95 px-3 py-2 text-center text-xs text-slate-700 shadow-[var(--shadow-panel)]">
+        <p role="status" className="absolute left-1/2 top-3 max-w-[calc(100%-6rem)] -translate-x-1/2 rounded-lg bg-surface/95 px-3 py-2 text-center text-xs text-fg-muted shadow-[var(--shadow-panel)]">
           The street map is slow to load. Report pins are still shown.
         </p>
       )}
 
       {geoError && (
-        <div role="alert" className="absolute left-3 right-16 top-3 flex items-start gap-2 rounded-lg bg-white px-3 py-2 text-sm text-red-800 shadow-[var(--shadow-panel)] sm:left-auto sm:right-16 sm:max-w-xs">
+        <div role="alert" className="absolute left-3 right-16 top-3 flex items-start gap-2 rounded-lg bg-surface px-3 py-2 text-sm text-danger shadow-[var(--shadow-panel)] sm:left-auto sm:right-16 sm:max-w-xs">
           <Icon name="alert" className="mt-0.5 h-4 w-4 flex-none" />
           <span className="flex-1">{geoError}</span>
-          <button type="button" onClick={() => setGeoError(null)} aria-label="Dismiss" className="-mr-1 grid h-6 w-6 place-items-center rounded text-slate-500 hover:bg-slate-100">
+          <button type="button" onClick={() => setGeoError(null)} aria-label="Dismiss" className="-mr-1 grid h-6 w-6 place-items-center rounded text-fg-muted hover:bg-surface-3">
             <Icon name="x" className="h-3.5 w-3.5" />
           </button>
         </div>
@@ -473,12 +495,12 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
             <ul className="space-y-1.5">
               {PUBLIC_STATUSES.map((s) => (
                 <li key={s} className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full ring-2 ring-white" style={{ backgroundColor: STATUS_COLOR[s] }} aria-hidden />
+                  <span className="h-3 w-3 rounded-full ring-2 ring-surface" style={{ backgroundColor: STATUS_COLOR[s] }} aria-hidden />
                   {STATUS_LABEL[s]}
                 </li>
               ))}
               <li className="flex items-center gap-2">
-                <span className="grid h-4 w-4 place-items-center rounded-full bg-ink-700 text-[8px] font-bold text-white" aria-hidden>
+                <span className="grid h-4 w-4 place-items-center rounded-full bg-primary text-[8px] font-bold text-white" aria-hidden>
                   3
                 </span>
                 Group of nearby reports
@@ -488,21 +510,21 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
             <ul className="space-y-1.5">
               {categories.map((c) => (
                 <li key={c.slug} className="flex items-center gap-2">
-                  <CategoryIcon slug={c.slug} className="h-4 w-4 text-slate-600" />
+                  <CategoryIcon slug={c.slug} className="h-4 w-4 text-fg-muted" />
                   {c.name}
                 </li>
               ))}
             </ul>
           </div>
         )}
-        <button type="button" onClick={() => setLegend((v) => !v)} aria-expanded={legend} aria-controls="map-legend" className="panel inline-flex h-11 items-center gap-2 px-3.5 text-sm font-semibold text-slate-800 hover:bg-slate-50">
+        <button type="button" onClick={() => setLegend((v) => !v)} aria-expanded={legend} aria-controls="map-legend" className="panel inline-flex h-11 items-center gap-2 px-3.5 text-sm font-semibold text-fg hover:bg-surface-2">
           <Icon name="layers" className="h-4.5 w-4.5" />
           Legend
         </button>
       </div>
 
       <div className="absolute bottom-20 right-3 flex flex-col gap-2 lg:bottom-8">
-        <div className="panel flex flex-col divide-y divide-slate-100 overflow-hidden">
+        <div className="panel flex flex-col divide-y divide-line overflow-hidden">
           <button type="button" onClick={() => mapRef.current?.zoomIn()} aria-label="Zoom in" className={ctrl}>
             <Icon name="plus" />
           </button>
@@ -512,9 +534,9 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
             </svg>
           </button>
         </div>
-        <div className="panel flex flex-col divide-y divide-slate-100 overflow-hidden">
+        <div className="panel flex flex-col divide-y divide-line overflow-hidden">
           <button type="button" onClick={locate} disabled={locating} aria-label="Show my location" className={ctrl}>
-            {locating ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-ink-200 border-t-ink-700" aria-hidden /> : <Icon name="locate" />}
+            {locating ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-line-strong border-t-primary" aria-hidden /> : <Icon name="locate" />}
           </button>
           <button
             type="button"
@@ -531,7 +553,7 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
             </svg>
           </button>
         </div>
-        <div className="panel hidden flex-col divide-y divide-slate-100 overflow-hidden sm:flex">
+        <div className="panel hidden flex-col divide-y divide-line overflow-hidden sm:flex">
           <button type="button" onClick={toggle3d} aria-pressed={pitched} aria-label="3D view" className={`${ctrl} text-sm font-bold`}>
             3D
           </button>

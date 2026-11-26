@@ -8,6 +8,7 @@ import SiteFooter from "@/components/SiteFooter";
 import Header from "@/components/Header";
 import { FeedbackProvider } from "@/components/ui/Feedback";
 import { MUNICIPALITY } from "@/lib/config";
+import { THEME_SCRIPT } from "@/lib/theme";
 
 // Self-hosted at build time: no render-blocking request to Google Fonts and no layout shift on load.
 const publicSans = Public_Sans({ subsets: ["latin"], variable: "--font-public-sans", display: "swap" });
@@ -29,15 +30,26 @@ export const metadata: Metadata = {
   twitter: { card: "summary" },
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#1d3557" };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#1d3557" },
+    { media: "(prefers-color-scheme: dark)", color: "#0d1726" },
+  ],
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={publicSans.variable}>
+    // data-theme is set by THEME_SCRIPT before React hydrates, hence suppressHydrationWarning on <html> only.
+    <html lang="en" className={publicSans.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="flex min-h-screen flex-col font-sans">
         <a
           href="#main"
-          className="sr-only z-50 rounded-md bg-ink-700 px-4 py-2 font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-3"
+          className="sr-only z-50 rounded-md bg-primary px-4 py-2 font-semibold text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-3"
         >
           Skip to content
         </a>

@@ -4,7 +4,7 @@ import EmptyState from "@/components/ui/EmptyState";
 import PageHeader from "@/components/ui/PageHeader";
 import Pagination from "@/components/ui/Pagination";
 import { formatDateTime } from "@/lib/format";
-import { requirePageRole } from "@/lib/guards";
+import { requirePagePermission } from "@/lib/guards";
 import { listAuditLogs } from "@/lib/reports";
 import { STATUS_LABEL } from "@/lib/status";
 import { listAdminActions } from "@/lib/users";
@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Audit log" };
 const PAGE_SIZE = 50;
 
 export default async function AuditPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  await requirePageRole("/admin/audit", "admin");
+  await requirePagePermission("/admin/audit", "audit.view");
 
   const page = Math.max(1, Math.floor(Number((await searchParams).page)) || 1);
   // Fetch one extra row to know whether there is a next page.
@@ -32,20 +32,20 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <h2 id="account-changes" className="mb-3 text-lg font-semibold">
             Recent account changes
           </h2>
-          <ul className="card divide-y divide-slate-100 text-sm">
+          <ul className="card divide-y divide-line text-sm">
             {accountActions.map((a) => (
               <li key={a.id} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:gap-4">
-                <time dateTime={a.createdAt} className="w-40 flex-none text-slate-600">
+                <time dateTime={a.createdAt} className="w-40 flex-none text-fg-muted">
                   {formatDateTime(a.createdAt)}
                 </time>
                 <div className="min-w-0">
-                  <span className="font-semibold capitalize text-slate-900">{a.action.replace(/_/g, " ")}</span>
-                  <span className="text-slate-700">
+                  <span className="font-semibold capitalize text-fg">{a.action.replace(/_/g, " ")}</span>
+                  <span className="text-fg-muted">
                     {" "}
                     · {a.targetName ?? "—"}
                     {a.targetEmail ? ` (${a.targetEmail})` : ""}
                   </span>
-                  <p className="text-slate-600">
+                  <p className="text-fg-muted">
                     by {a.actorName ?? "—"}
                     {a.detail ? ` · ${Object.entries(a.detail).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : String(v)}`).join(" · ")}` : ""}
                   </p>
@@ -66,7 +66,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
           <div className="card overflow-x-auto">
             <table className="w-full min-w-[720px] text-left text-sm">
               <caption className="sr-only">Report changes, page {page}</caption>
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+              <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-fg-muted">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">When</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Report</th>
@@ -75,20 +75,20 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                   <th scope="col" className="px-4 py-3 font-semibold">Note</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {entries.map((e) => (
-                  <tr key={e.id} className="align-top hover:bg-slate-50/60">
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                  <tr key={e.id} className="align-top hover:bg-surface-2/60">
+                    <td className="whitespace-nowrap px-4 py-3 text-fg-muted">
                       <time dateTime={e.createdAt}>{formatDateTime(e.createdAt)}</time>
                     </td>
                     <td className="max-w-[16rem] px-4 py-3">
-                      <Link href={`/reports/${e.reportId}`} className="font-medium text-slate-900 hover:text-ink-700 hover:underline">
+                      <Link href={`/reports/${e.reportId}`} className="font-medium text-fg hover:text-accent hover:underline">
                         {e.reportTitle}
                       </Link>
                     </td>
-                    <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                    <td className="whitespace-nowrap px-4 py-3 text-fg-muted">
                       {e.kind !== "status" ? (
-                        <span className="font-semibold">{e.kind === "feedback" ? "Feedback" : "Follow-up request"}</span>
+                        <span className="font-semibold">{({ feedback: "Feedback", followup: "Follow-up request", edited: "Edited by the reporter" } as Record<string, string>)[e.kind] ?? e.kind}</span>
                       ) : (
                         <>
                           {e.fromStatus ? `${STATUS_LABEL[e.fromStatus]} → ` : ""}
@@ -96,8 +96,8 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                         </>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-700">{e.actorName ?? "—"}</td>
-                    <td className="max-w-[20rem] px-4 py-3 text-slate-600">{e.note ?? ""}</td>
+                    <td className="px-4 py-3 text-fg-muted">{e.actorName ?? "—"}</td>
+                    <td className="max-w-[20rem] px-4 py-3 text-fg-muted">{e.note ?? ""}</td>
                   </tr>
                 ))}
               </tbody>

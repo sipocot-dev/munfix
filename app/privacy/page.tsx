@@ -21,9 +21,9 @@ export default function Page() {
 <li><strong>Technical data</strong>: a session cookie that keeps you signed in, and short-lived records used to limit abuse (for example, login attempts per IP address).</li>
 </ul>
 <h2>How we use it</h2>
-<p>To run the service: show verified reports on the public map, let you follow your own reports, email you about status changes or password resets if email is enabled, and let authorised city staff review and resolve reports. We do not sell your data and do not use advertising trackers.</p>
+<p>To run the service: show reports on the public map, let you follow your own reports, email you about status changes or password resets if email is enabled, and let authorised city staff review and resolve reports. We do not sell your data and do not use advertising trackers.</p>
 <h2>What is public</h2>
-<p>Once a report is verified, its title, description, photos, location and status timeline are visible to everyone. Your name and email are not shown publicly. Do not include personal information in report text or photos.</p>
+<p>A report is public as soon as you submit it: its title, description, photos, location and status timeline are visible to everyone. Moderators can hide reports, which removes them from public view. Your name and email are not shown publicly. Do not include personal information in report text or photos.</p>
 <h2>Who can see your data</h2>
 <p>Moderators and administrators can see who submitted a report. Field staff see published reports without reporter details.</p>
 <h2>Retention and deletion</h2>

@@ -2,29 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { Role } from "@/lib/permissions";
 import Icon, { type IconName } from "./ui/Icon";
 
-const ITEMS: { href: string; label: string; icon: IconName; roles: Role[] }[] = [
-  { href: "/admin", label: "Work queue", icon: "queue", roles: ["moderator", "staff", "admin"] },
-  { href: "/admin/overview", label: "Overview", icon: "chart", roles: ["moderator", "admin"] },
-  { href: "/admin/users", label: "Users & roles", icon: "users", roles: ["admin"] },
-  { href: "/admin/audit", label: "Audit log", icon: "history", roles: ["admin"] },
-  { href: "/admin/system", label: "System", icon: "settings", roles: ["admin"] },
+const ITEMS: { href: string; label: string; icon: IconName }[] = [
+  { href: "/admin", label: "Work queue", icon: "queue" },
+  { href: "/admin/overview", label: "Overview", icon: "chart" },
+  { href: "/admin/users", label: "Users", icon: "users" },
+  { href: "/admin/roles", label: "Roles", icon: "shield" },
+  { href: "/admin/audit", label: "Audit log", icon: "history" },
+  { href: "/admin/system", label: "System", icon: "settings" },
 ];
 
-export function workspaceItems(role: Role) {
-  return ITEMS.filter((i) => i.roles.includes(role));
-}
-
-/** Workspace tabs, shown by app/admin/layout.tsx. Scrolls sideways on narrow phones instead of wrapping. */
-export default function AdminNav({ role }: { role: Role }) {
+/**
+ * Workspace tabs, shown by app/admin/layout.tsx. `areas` are the pages this user's permissions open
+ * (WORKSPACE_AREAS in lib/permissions.ts). Scrolls sideways on narrow phones instead of wrapping.
+ */
+export default function AdminNav({ areas }: { areas: string[] }) {
   const pathname = usePathname();
-  const items = workspaceItems(role);
+  const items = ITEMS.filter((i) => areas.includes(i.href));
   if (items.length < 2) return null;
   return (
     <nav aria-label="Workspace" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-      <ul className="flex min-w-max gap-1 border-b border-slate-200">
+      <ul className="flex min-w-max gap-1 border-b border-line">
         {items.map((i) => {
           const current = i.href === "/admin" ? pathname === "/admin" : pathname.startsWith(i.href);
           return (
@@ -33,7 +32,7 @@ export default function AdminNav({ role }: { role: Role }) {
                 href={i.href}
                 aria-current={current ? "page" : undefined}
                 className={`-mb-px flex h-11 items-center gap-2 border-b-2 px-3 text-sm font-semibold transition-colors ${
-                  current ? "border-ink-700 text-ink-800" : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  current ? "border-primary text-accent-strong" : "border-transparent text-fg-muted hover:border-line-strong hover:text-fg"
                 }`}
               >
                 <Icon name={i.icon} className="h-4.5 w-4.5" />

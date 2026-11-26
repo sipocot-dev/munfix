@@ -19,8 +19,8 @@ export default function LocationCard({ lat, lng, address }: { lat: number; lng: 
 
   return (
     <section className="card p-4" aria-label="Location">
-      {address && <p className="text-sm font-medium text-slate-800">{address}</p>}
-      <p className="select-all font-mono text-sm text-slate-600">{gps}</p>
+      {address && <p className="text-sm font-medium text-fg">{address}</p>}
+      <p className="select-all font-mono text-sm text-fg-muted">{gps}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button type="button" onClick={copy} className="btn btn-secondary btn-sm">
           <Icon name="copy" className="h-4 w-4" />

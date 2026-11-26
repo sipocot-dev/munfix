@@ -26,7 +26,7 @@ export default function TestEmailButton() {
       <button type="button" onClick={send} disabled={busy} className="btn btn-secondary btn-sm">
         {busy ? "Sending…" : "Send test email to me"}
       </button>
-      {msg && <span role="status" className={`text-sm ${msg.ok ? "text-green-800" : "text-red-700"}`}>{msg.text}</span>}
+      {msg && <span role="status" className={`text-sm ${msg.ok ? "text-success" : "text-danger"}`}>{msg.text}</span>}
     </div>
   );
 }

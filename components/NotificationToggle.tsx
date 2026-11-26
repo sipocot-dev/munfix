@@ -39,16 +39,16 @@ export default function NotificationToggle({ initial }: { initial: boolean }) {
   return (
     <div className="card flex flex-wrap items-center justify-between gap-4 p-4 sm:p-5">
       <div className="flex gap-3">
-        <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-ink-50 text-ink-700">
+        <span className="grid h-10 w-10 flex-none place-items-center rounded-lg bg-accent-soft text-accent">
           <Icon name="mail" className="h-5 w-5" />
         </span>
         <div>
-          <p id="email-updates-label" className="font-semibold text-slate-900">
+          <p id="email-updates-label" className="font-semibold text-fg">
             Email updates
           </p>
-          <p className="text-sm text-slate-600">Get an email when one of your reports changes status.</p>
+          <p className="text-sm text-fg-muted">Get an email when one of your reports changes status.</p>
           {error && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p role="alert" className="mt-1 text-sm text-danger">
               {error}
             </p>
           )}
@@ -61,9 +61,9 @@ export default function NotificationToggle({ initial }: { initial: boolean }) {
         aria-labelledby="email-updates-label"
         disabled={busy}
         onClick={() => change(!on)}
-        className={`relative h-7 w-12 flex-none rounded-full transition-colors disabled:opacity-60 ${on ? "bg-ink-700" : "bg-slate-300"}`}
+        className={`relative h-7 w-12 flex-none rounded-full transition-colors disabled:opacity-60 ${on ? "bg-primary" : "bg-line-strong"}`}
       >
-        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${on ? "translate-x-5" : ""}`} aria-hidden />
+        <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-surface shadow transition-transform ${on ? "translate-x-5" : ""}`} aria-hidden />
       </button>
     </div>
   );

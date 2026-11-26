@@ -21,7 +21,7 @@ Browser ──HTTPS──> Cloudflare (proxy) ──> Vercel (Next.js 15 App Rou
 
 | Boundary | What crosses it | Control |
 | --- | --- | --- |
-| Browser → API | JSON and multipart bodies, query strings, cookies | zod schemas (`lib/validation.ts`), `requireUser` / `requireRole` (`lib/api.ts`), Origin check on writes, rate limits (`lib/rate-limit.ts`) |
+| Browser → API | JSON and multipart bodies, query strings, cookies | zod schemas (`lib/validation.ts`), `requireUser` / `requirePermission` (`lib/api.ts`), Origin check on writes, rate limits (`lib/rate-limit.ts`) |
 | Browser → media | `/api/v1/media/<uuid>.<ext>` | Strict filename pattern; `canViewMedia` serves photos of unpublished reports only to the owner, moderators and admins |
 | Uploads → storage | File bytes | Type is decided by magic bytes, never by the client; at most 3 files of 5 MB; names are server-generated UUIDs |
 | App → Postgres | SQL | Parameterised queries only; identifiers (`DATABASE_SCHEMA`) are checked against a strict pattern |
@@ -30,10 +30,10 @@ Browser ──HTTPS──> Cloudflare (proxy) ──> Vercel (Next.js 15 App Rou
 | Vercel Cron → app | `Authorization: Bearer $CRON_SECRET` | Constant-time compare; closed when the secret is unset |
 | Edge → app | `X-Real-IP`, `X-Forwarded-For` | `clientIp()` trusts `X-Real-IP` (set by Vercel), else the last forwarded hop |
 
-## Roles
+## Roles and permissions
 
-`citizen`, `moderator`, `staff` (field staff, optionally limited to categories) and `admin`. The rules live in `lib/permissions.ts` and are enforced on the server in `lib/reports.ts` and `lib/users.ts`. A session that still holds a temporary password counts as a citizen until the password is changed. The role is copied into the session. Changing a role, deactivating an account or resetting a password revokes all of that user's sessions.
+Authorization is permission-based ([roles-and-permissions.md](roles-and-permissions.md)). The session in Redis stores the user and their role key; `getSession()` resolves the role's current permissions from the `roles` table on every request, so editing or disabling a role applies at once. Built-in roles (citizen, staff, moderator, admin) are defined in `lib/permissions.ts`; custom roles are data. A session holding a temporary password, or whose role is disabled, has no permissions. Changing a user's role, deactivating them or resetting their password also revokes all of their sessions.
 
 ## Report lifecycle
 
-`submitted → under_review → verified (public) → in_progress → resolved`, with `rejected`, `duplicate` and `withdrawn` as end states (`lib/status.ts`). The status change, its `report_events` audit row and the reporter's email (`email_outbox`) are written in one transaction.
+A report is published as soon as it is submitted (`verified`, labelled "Published"). Moderators can put a public report `under_review` (still public), `hidden` (private, reversible, reason required), `rejected` (final, reason required) or `duplicate`; field staff move it to `in_progress` and `resolved` (`lib/status.ts`). Public = `verified`, `under_review`, `in_progress`, `resolved`; the public timeline shows only events after publication. The status change, its `report_events` audit row and the reporter's email (`email_outbox`) are written in one transaction. Reporter edits are audited as `edited` events.

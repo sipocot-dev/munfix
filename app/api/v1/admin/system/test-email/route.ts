@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireAdmin, route } from "@/lib/api";
+import { requirePermission, route } from "@/lib/api";
 import { query } from "@/lib/db";
 import { HttpError } from "@/lib/errors";
 import { mailEnabled, sendMail } from "@/lib/mail";
 
 /** Sends a test message to the signed-in administrator to verify SMTP settings. */
 export const POST = route(async () => {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("system.view");
   if (!mailEnabled()) throw new HttpError(409, "Email is not configured. Set SMTP_URL (or SMTP_HOST) and MAIL_FROM.");
   const [u] = await query<{ email: string }>("SELECT email FROM users WHERE id = $1", [admin.userId]);
   try {

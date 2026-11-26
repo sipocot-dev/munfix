@@ -3,7 +3,10 @@ import { readJson, route } from "@/lib/api";
 import { query } from "@/lib/db";
 import { HttpError } from "@/lib/errors";
 import { hashPassword, verifyPassword } from "@/lib/passwords";
-import type { Role } from "@/lib/permissions";
+import { hasWorkspace, type Role } from "@/lib/permissions";
+import { isLocalEnvironment } from "@/lib/env";
+import { isDemoAccount } from "@/lib/setup";
+import { resolveRole } from "@/lib/roles";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 import { createSession } from "@/lib/session";
 import { loginSchema } from "@/lib/validation";
@@ -30,8 +33,16 @@ export const POST = route(async (req) => {
   if (!user || !user.password_hash || !ok) throw new HttpError(401, "Incorrect email or password");
   // Only said after the password is right, so it does not reveal which emails exist.
   if (!user.is_active) throw new HttpError(403, "This account has been deactivated. Please contact the city administrator.");
+  // Test accounts have published passwords, so they only work on a local or test deployment.
+  if (isDemoAccount(input.email) && !isLocalEnvironment()) throw new HttpError(401, "Incorrect email or password");
 
   await query("UPDATE users SET last_login_at = now() WHERE id = $1", [user.id]);
   await createSession({ userId: user.id, name: user.name, role: user.role, mustChangePassword: user.must_change_password });
-  return NextResponse.json({ ok: true, role: user.role, mustChangePassword: user.must_change_password });
+  const role = await resolveRole(user.role);
+  return NextResponse.json({
+    ok: true,
+    role: user.role,
+    workspace: !user.must_change_password && role.isActive && hasWorkspace(role.permissions),
+    mustChangePassword: user.must_change_password,
+  });
 });

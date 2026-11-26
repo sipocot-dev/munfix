@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiError } from "@/lib/client";
 import { formatDate } from "@/lib/format";
-import { ROLES, ROLE_DESCRIPTION, ROLE_LABEL, type Role } from "@/lib/permissions";
+import { isCategoryScoped, type Permission } from "@/lib/permissions";
 import type { UserRow } from "@/lib/users";
 import { initials } from "./SiteNav";
 import Alert from "./ui/Alert";
@@ -17,6 +17,14 @@ import Spinner from "./ui/Spinner";
 interface Cat {
   id: number;
   name: string;
+}
+
+export interface RoleOption {
+  key: string;
+  name: string;
+  description: string;
+  permissions: Permission[];
+  isActive: boolean;
 }
 
 const PAGE_SIZE = 50;
@@ -33,7 +41,7 @@ function CategoryPicker({ cats, value, onChange }: { cats: Cat[]; value: number[
               type="checkbox"
               checked={value.includes(c.id)}
               onChange={(e) => onChange(e.target.checked ? [...value, c.id] : value.filter((x) => x !== c.id))}
-              className="h-4 w-4 accent-ink-700"
+              className="h-4 w-4 accent-primary"
             />
             {c.name}
           </label>
@@ -46,10 +54,10 @@ function CategoryPicker({ cats, value, onChange }: { cats: Cat[]; value: number[
 function TempPassword({ email, password, onClose }: { email: string; password: string; onClose: () => void }) {
   const toast = useToast();
   return (
-    <div role="alert" className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+    <div role="alert" className="mb-6 rounded-lg border border-warning-line bg-warning-soft p-4 text-sm text-warning">
       <p className="font-semibold">Temporary password for {email}</p>
       <div className="my-3 flex flex-wrap items-center gap-2">
-        <code className="select-all rounded-md border border-amber-200 bg-white px-3 py-2 font-mono text-base">{password}</code>
+        <code className="select-all rounded-md border border-warning-line bg-surface px-3 py-2 font-mono text-base">{password}</code>
         <button
           type="button"
           className="btn btn-secondary btn-sm"
@@ -72,7 +80,11 @@ function TempPassword({ email, password, onClose }: { email: string; password: s
   );
 }
 
-export default function UserManager({ categories, selfId }: { categories: Cat[]; selfId: string }) {
+export default function UserManager({ categories, roles, selfId }: { categories: Cat[]; roles: RoleOption[]; selfId: string }) {
+  const roleOf = (key: string) => roles.find((r) => r.key === key);
+  const scoped = (key: string) => isCategoryScoped(roleOf(key)?.permissions);
+  // Disabled roles cannot be assigned; a user who already has one still shows it.
+  const assignable = roles.filter((r) => r.isActive);
   const toast = useToast();
   const confirm = useConfirm();
   const [users, setUsers] = useState<UserRow[]>([]);
@@ -85,7 +97,7 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
   const [error, setError] = useState<string | null>(null);
   const [temp, setTemp] = useState<{ email: string; password: string } | null>(null);
   const [creating, setCreating] = useState(false);
-  const [newRole, setNewRole] = useState<Role>("moderator");
+  const [newRole, setNewRole] = useState(assignable.find((r) => r.key === "moderator")?.key ?? assignable[0]?.key ?? "citizen");
   const [newCats, setNewCats] = useState<number[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -147,7 +159,7 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
       const res = await fetch("/api/v1/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: f.get("name"), email: f.get("email"), role: newRole, categoryIds: newRole === "staff" ? newCats : undefined }),
+        body: JSON.stringify({ name: f.get("name"), email: f.get("email"), role: newRole, categoryIds: scoped(newRole) ? newCats : undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) return setError(apiError(data));
@@ -178,7 +190,7 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative sm:w-72">
-          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <input
             type="search"
             value={q}
@@ -201,9 +213,9 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
           className="field sm:w-48"
         >
           <option value="">All roles</option>
-          {ROLES.map((r) => (
-            <option key={r} value={r}>
-              {ROLE_LABEL[r]}
+          {roles.map((r) => (
+            <option key={r.key} value={r.key}>
+              {r.name}
             </option>
           ))}
         </select>
@@ -224,32 +236,32 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
               <input name="email" type="email" required autoComplete="off" className="field" />
             </FormField>
           </div>
-          <FormField label="Role" hint={ROLE_DESCRIPTION[newRole]}>
-            <select value={newRole} onChange={(e) => setNewRole(e.target.value as Role)} className="field sm:max-w-xs">
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {ROLE_LABEL[r]}
+          <FormField label="Role" hint={roleOf(newRole)?.description}>
+            <select value={newRole} onChange={(e) => setNewRole(e.target.value)} className="field sm:max-w-xs">
+              {assignable.map((r) => (
+                <option key={r.key} value={r.key}>
+                  {r.name}
                 </option>
               ))}
             </select>
           </FormField>
-          {newRole === "staff" && <CategoryPicker cats={categories} value={newCats} onChange={setNewCats} />}
-          <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+          {scoped(newRole) && <CategoryPicker cats={categories} value={newCats} onChange={setNewCats} />}
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
             <button type="submit" disabled={busy === "create"} className="btn btn-primary">
               {busy === "create" && <Spinner />}
               {busy === "create" ? "Creating…" : "Create account"}
             </button>
-            <p className="text-sm text-slate-600">A one-time temporary password is generated; it is shown once.</p>
+            <p className="text-sm text-fg-muted">A one-time temporary password is generated; it is shown once.</p>
           </div>
         </form>
       )}
 
-      <p className="mb-3 text-sm text-slate-600" aria-live="polite">
+      <p className="mb-3 text-sm text-fg-muted" aria-live="polite">
         {loading ? "Loading…" : total === 0 ? "No accounts match." : `Showing ${from}–${to} of ${total} account${total === 1 ? "" : "s"}`}
       </p>
 
       {loadError && (
-        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">
           {loadError}
           <button type="button" onClick={load} className="btn btn-secondary btn-sm">
             Try again
@@ -274,20 +286,20 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
           {users.map((u) => {
             const self = u.id === selfId;
             return (
-              <li key={u.id} className={`card p-4 sm:p-5 ${u.isActive ? "" : "bg-slate-50"}`}>
+              <li key={u.id} className={`card p-4 sm:p-5 ${u.isActive ? "" : "bg-surface-2"}`}>
                 <div className="flex flex-wrap items-start gap-4">
-                  <span className={`grid h-10 w-10 flex-none place-items-center rounded-full text-sm font-bold ${u.isActive ? "bg-ink-700 text-white" : "bg-slate-300 text-slate-700"}`} aria-hidden>
+                  <span className={`grid h-10 w-10 flex-none place-items-center rounded-full text-sm font-bold ${u.isActive ? "bg-primary text-white" : "bg-line-strong text-fg-muted"}`} aria-hidden>
                     {initials(u.name)}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="flex flex-wrap items-center gap-2 font-semibold text-slate-900">
+                    <p className="flex flex-wrap items-center gap-2 font-semibold text-fg">
                       {u.name}
-                      {self && <span className="text-xs font-normal text-slate-600">(you)</span>}
-                      {!u.isActive && <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700">Deactivated</span>}
-                      {u.mustChangePassword && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">Temporary password</span>}
+                      {self && <span className="text-xs font-normal text-fg-muted">(you)</span>}
+                      {!u.isActive && <span className="rounded-full bg-surface-3 px-2 py-0.5 text-xs font-semibold text-fg-muted">Deactivated</span>}
+                      {u.mustChangePassword && <span className="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">Temporary password</span>}
                     </p>
-                    <p className="break-all text-sm text-slate-700">{u.email}</p>
-                    <p className="mt-1 text-xs text-slate-600">
+                    <p className="break-all text-sm text-fg-muted">{u.email}</p>
+                    <p className="mt-1 text-xs text-fg-muted">
                       Joined {formatDate(u.createdAt)} · {u.lastLoginAt ? `last login ${formatDate(u.lastLoginAt)}` : "never logged in"} · {u.reportCount} report{u.reportCount === 1 ? "" : "s"}
                       {u.providers.length > 0 && ` · ${u.providers.join(", ")}`}
                     </p>
@@ -302,29 +314,31 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
                       disabled={self || busy === u.id}
                       title={self ? "You cannot change your own role" : undefined}
                       onChange={async (e) => {
-                        const role = e.target.value as Role;
+                        const role = roleOf(e.target.value);
+                        if (!role) return;
                         const ok = await confirm({
-                          title: `Make ${u.name} ${ROLE_LABEL[role].toLowerCase()}?`,
-                          body: `${ROLE_DESCRIPTION[role]} They will be signed out so the change takes effect at once.`,
+                          title: `Change ${u.name}'s role to ${role.name}?`,
+                          body: `${role.description} They will be signed out so the change takes effect at once.`,
                           confirmLabel: "Change role",
                         });
-                        if (ok) await patch(u, { role }, `${u.name} is now ${ROLE_LABEL[role].toLowerCase()}.`);
+                        if (ok) await patch(u, { role: role.key }, `${u.name}'s role is now ${role.name}.`);
                       }}
                       className="field"
                     >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>
-                          {ROLE_LABEL[r]}
+                      {roles.filter((r) => r.isActive || r.key === u.role).map((r) => (
+                        <option key={r.key} value={r.key}>
+                          {r.name}
+                          {r.isActive ? "" : " (disabled)"}
                         </option>
                       ))}
                     </select>
                   </div>
                 </div>
 
-                {u.role === "staff" && (
+                {scoped(u.role) && (
                   <div className="mt-3 text-sm sm:pl-14">
                     {editing === u.id ? (
-                      <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="space-y-3 rounded-lg border border-line bg-surface-2 p-3">
                         <CategoryPicker cats={categories} value={editCats} onChange={setEditCats} />
                         <div className="flex gap-2">
                           <button
@@ -344,12 +358,12 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
                         </div>
                       </div>
                     ) : (
-                      <p className="text-slate-700">
+                      <p className="text-fg-muted">
                         <span className="font-semibold">Covers:</span>{" "}
                         {u.categoryIds.length === 0 ? "all categories" : categories.filter((c) => u.categoryIds.includes(c.id)).map((c) => c.name).join(", ")}{" "}
                         <button
                           type="button"
-                          className="font-semibold text-ink-700 underline underline-offset-2"
+                          className="font-semibold text-accent underline underline-offset-2"
                           onClick={() => {
                             setEditing(u.id);
                             setEditCats(u.categoryIds);
@@ -362,7 +376,7 @@ export default function UserManager({ categories, selfId }: { categories: Cat[];
                   </div>
                 )}
 
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3 sm:pl-14">
+                <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-3 sm:pl-14">
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"

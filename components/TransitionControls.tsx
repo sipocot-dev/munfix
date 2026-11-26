@@ -3,15 +3,16 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiError, extractId } from "@/lib/client";
-import { STATUS_LABEL, type Status } from "@/lib/status";
+import { REASON_REQUIRED, STATUS_LABEL, type Status } from "@/lib/status";
 import Alert from "./ui/Alert";
 import { useToast } from "./ui/Feedback";
 import FormField from "./ui/FormField";
 import Spinner from "./ui/Spinner";
 
 const ACTION_LABEL: Partial<Record<Status, string>> = {
-  under_review: "Start review",
-  verified: "Verify & publish",
+  under_review: "Put under review…",
+  verified: "Publish",
+  hidden: "Hide…",
   in_progress: "Mark in progress",
   resolved: "Mark resolved",
   rejected: "Reject…",
@@ -20,6 +21,8 @@ const ACTION_LABEL: Partial<Record<Status, string>> = {
 
 const NOTE_HINT: Partial<Record<Status, string>> = {
   verified: "Optional. Shown on the public timeline.",
+  under_review: "Optional. Shown on the public timeline, so do not repeat personal details.",
+  hidden: "Required. The reporter sees this reason; the public does not see the report at all.",
   in_progress: "Optional. For example: Crew scheduled for Thursday.",
   resolved: "Optional. For example: Pothole filled and road repaved.",
   rejected: "Required. The reporter sees this reason.",
@@ -28,8 +31,8 @@ const NOTE_HINT: Partial<Record<Status, string>> = {
 
 /** The actions that publish or move work forward get the strong style; rejecting gets the danger style. */
 function buttonClass(to: Status, pending: Status | null): string {
-  if (to === "rejected") return "btn-danger";
-  if (pending === to || to === "verified" || to === "resolved") return "btn-primary";
+  if (to === "rejected" || to === "hidden") return "btn-danger";
+  if (pending === to || to === "resolved") return "btn-primary";
   return "btn-secondary";
 }
 
@@ -53,14 +56,12 @@ export default function TransitionControls({
   const [error, setError] = useState<string | null>(null);
 
   if (allowed.length === 0) {
-    return <p className="text-sm text-slate-600">No further actions for your role at this stage.</p>;
+    return <p className="text-sm text-fg-muted">No further actions for your role at this stage.</p>;
   }
 
   function choose(to: Status) {
     setError(null);
-    // Starting a review needs nothing else; every other action opens a short form first.
-    if (to === "under_review") void submit(to);
-    else setPending(pending === to ? null : to);
+    setPending(pending === to ? null : to);
   }
 
   async function submit(to: Status) {
@@ -98,11 +99,10 @@ export default function TransitionControls({
             key={to}
             type="button"
             disabled={busy}
-            aria-expanded={to === "under_review" ? undefined : pending === to}
+            aria-expanded={pending === to}
             onClick={() => choose(to)}
             className={`btn btn-sm ${buttonClass(to, pending)}`}
           >
-            {busy && to === "under_review" && <Spinner />}
             {ACTION_LABEL[to] ?? STATUS_LABEL[to]}
           </button>
         ))}
@@ -114,7 +114,7 @@ export default function TransitionControls({
             e.preventDefault();
             void submit(pending);
           }}
-          className="animate-fade-up space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3.5"
+          className="animate-fade-up space-y-3 rounded-lg border border-line bg-surface-2 p-3.5"
           aria-label={ACTION_LABEL[pending]?.replace("…", "")}
         >
           {pending === "duplicate" && (
@@ -122,11 +122,11 @@ export default function TransitionControls({
               <input value={duplicateOf} onChange={(e) => setDuplicateOf(e.target.value)} required className="field" autoComplete="off" spellCheck={false} />
             </FormField>
           )}
-          <FormField label={pending === "rejected" ? "Reason" : "Note"} hint={NOTE_HINT[pending]}>
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} required={pending === "rejected"} maxLength={500} rows={2} className="field" />
+          <FormField label={REASON_REQUIRED.includes(pending) ? "Reason" : "Note"} hint={NOTE_HINT[pending]}>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} required={REASON_REQUIRED.includes(pending)} maxLength={500} rows={2} className="field" />
           </FormField>
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={busy} className={`btn btn-sm ${pending === "rejected" ? "btn-danger-solid" : "btn-primary"}`}>
+            <button type="submit" disabled={busy} className={`btn btn-sm ${REASON_REQUIRED.includes(pending) ? "btn-danger-solid" : "btn-primary"}`}>
               {busy && <Spinner />}
               {busy ? "Saving…" : `Confirm: ${STATUS_LABEL[pending]}`}
             </button>

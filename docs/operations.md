@@ -16,6 +16,10 @@ After deploy:
 2. Load `/`, open one report, and open `/login`.
 3. Check Vercel runtime logs for `"level":"error"` lines in the first few minutes.
 
+### Migration 007 (roles and automatic publication)
+
+Additive and safe to run on the live database: it creates `roles` with the four built-in roles, replaces the `users.role` check with a foreign key, adds the `hidden` status and makes `verified` the default status for new reports. Reports that were still waiting for their first review (`under_review` and never published) are moved to `submitted`, which stays private until a moderator publishes, hides or rejects them; nothing becomes public retroactively. Rolling the code back leaves the extra table and status harmless, but reports created while the new code ran are already public, and any report a moderator hid has status `hidden`, which the old code does not know: it stays private (the old code treats unknown statuses as not public), but the old work queue and report page may error on those reports. Before rolling back, restore hidden reports you want public, or reject them.
+
 ## Rollback
 
 - **Code:** in Vercel → Deployments, "Instant Rollback" (or promote the previous deployment). This does not touch the database.

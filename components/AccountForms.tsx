@@ -140,8 +140,8 @@ export function DeleteAccount() {
     );
   }
   return (
-    <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4">
-      <p className="text-sm leading-relaxed text-red-900">
+    <div className="space-y-4 rounded-lg border border-danger-line bg-danger-soft p-4">
+      <p className="text-sm leading-relaxed text-danger">
         This removes your name and email and signs you out everywhere. Reports still awaiting review are withdrawn; published reports stay on the public map without your name. <strong>This cannot be undone.</strong>
       </p>
       <FormField label="Type DELETE to confirm">

@@ -16,11 +16,11 @@ export default function EmptyState({
 }) {
   return (
     <div className={`card flex flex-col items-center px-6 py-12 text-center ${className}`}>
-      <span className="grid h-12 w-12 place-items-center rounded-full bg-ink-50 text-ink-700">
+      <span className="grid h-12 w-12 place-items-center rounded-full bg-accent-soft text-accent">
         <Icon name={icon} className="h-6 w-6" />
       </span>
-      <p className="mt-4 font-semibold text-slate-900">{title}</p>
-      {description && <p className="mt-1 max-w-md text-sm text-slate-600">{description}</p>}
+      <p className="mt-4 font-semibold text-fg">{title}</p>
+      {description && <p className="mt-1 max-w-md text-sm text-fg-muted">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );

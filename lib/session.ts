@@ -1,17 +1,28 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import type { Role } from "./permissions";
+import type { Permission, Role } from "./permissions";
 import { redis } from "./redis";
+import { resolveRole } from "./roles";
 
 const COOKIE = "munfix_session";
 const TTL_SECONDS = 60 * 60 * 24 * 7;
 
-export interface Session {
+/** What is stored in Redis. Permissions are deliberately not stored: they are read from the role on every request. */
+export interface StoredSession {
   userId: string;
   name: string;
   role: Role;
   /** Set for accounts created with a temporary password until the user chooses their own. */
   mustChangePassword?: boolean;
+}
+
+export interface Session extends StoredSession {
+  roleName: string;
+  /**
+   * The role's current permissions. Empty while the account holds a temporary password or when its role
+   * is disabled, so editing or disabling a role takes effect on the next request, everywhere.
+   */
+  permissions: Permission[];
 }
 
 function key(token: string): string {
@@ -27,9 +38,10 @@ function secureCookies(): boolean {
 }
 
 /** Route handlers only: sets the session cookie. */
-export async function createSession(session: Session): Promise<void> {
+export async function createSession(input: StoredSession): Promise<void> {
   const token = randomBytes(32).toString("hex");
   const k = key(token);
+  const session: StoredSession = { userId: input.userId, name: input.name, role: input.role, mustChangePassword: input.mustChangePassword };
   await redis.multi().set(k, JSON.stringify(session), "EX", TTL_SECONDS).sadd(userIndex(session.userId), k).expire(userIndex(session.userId), TTL_SECONDS).exec();
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
@@ -43,12 +55,20 @@ export async function createSession(session: Session): Promise<void> {
 export async function getSession(): Promise<Session | null> {
   const token = (await cookies()).get(COOKIE)?.value;
   if (!token) return null;
+  let stored: StoredSession;
   try {
     const raw = await redis.get(key(token));
-    return raw ? (JSON.parse(raw) as Session) : null;
+    if (!raw) return null;
+    stored = JSON.parse(raw) as StoredSession;
   } catch {
     return null;
   }
+  const role = await resolveRole(stored.role);
+  return {
+    ...stored,
+    roleName: role.name,
+    permissions: stored.mustChangePassword || !role.isActive ? [] : [...role.permissions],
+  };
 }
 
 /** Route handlers only. */
@@ -60,7 +80,7 @@ export async function destroySession(): Promise<void> {
       const k = key(token);
       const raw = await redis.get(k);
       await redis.del(k);
-      if (raw) await redis.srem(userIndex((JSON.parse(raw) as Session).userId), k);
+      if (raw) await redis.srem(userIndex((JSON.parse(raw) as StoredSession).userId), k);
     } catch {
       // ignore
     }

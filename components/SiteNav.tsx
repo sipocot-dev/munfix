@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import LogoutButton from "./LogoutButton";
+import ThemeSwitcher from "./ThemeSwitcher";
 import Icon, { type IconName } from "./ui/Icon";
 
 export interface NavItem {
@@ -50,7 +51,7 @@ export default function SiteNav({
 
   const linkClass = (href: string) =>
     `inline-flex h-10 items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors ${
-      isActive(pathname, href) ? "bg-ink-50 text-ink-800" : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+      isActive(pathname, href) ? "bg-accent-soft text-accent-strong" : "text-fg-muted hover:bg-surface-3 hover:text-fg"
     }`;
 
   return (
@@ -78,32 +79,37 @@ export default function SiteNav({
               onClick={() => account.setOpen(!account.open)}
               aria-expanded={account.open}
               aria-controls="account-menu"
-              className="flex h-10 items-center gap-2 rounded-md px-2 text-sm hover:bg-slate-100"
+              className="flex h-10 items-center gap-2 rounded-md px-2 text-sm hover:bg-surface-3"
             >
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-ink-700 text-xs font-bold text-white" aria-hidden>
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-primary text-xs font-bold text-white" aria-hidden>
                 {initials(user.name)}
               </span>
-              <span className="max-w-[10rem] truncate font-semibold text-slate-800">{user.name}</span>
-              <Icon name="chevronDown" className="h-4 w-4 text-slate-500" />
+              <span className="max-w-[10rem] truncate font-semibold text-fg">{user.name}</span>
+              <Icon name="chevronDown" className="h-4 w-4 text-fg-muted" />
             </button>
             <div
               id="account-menu"
               hidden={!account.open}
-              className="animate-fade-up absolute right-0 top-full z-40 mt-2 w-60 rounded-lg border border-slate-200 bg-white p-1.5 shadow-[var(--shadow-raised)]"
+              className="animate-fade-up absolute right-0 top-full z-40 mt-2 w-60 rounded-lg border border-line bg-surface p-1.5 shadow-[var(--shadow-raised)]"
             >
-              <div className="border-b border-slate-100 px-3 pb-2.5 pt-1.5">
-                <p className="truncate text-sm font-semibold text-slate-900">{user.name}</p>
-                <p className="text-xs text-slate-500">{user.roleLabel ?? "Citizen"}</p>
+              <div className="border-b border-line px-3 pb-2.5 pt-1.5">
+                <p className="truncate text-sm font-semibold text-fg">{user.name}</p>
+                <p className="text-xs text-fg-muted">{user.roleLabel ?? "Citizen"}</p>
               </div>
               <MenuLink href="/me" icon="list">My reports</MenuLink>
               <MenuLink href="/account" icon="user">Account settings</MenuLink>
-              <div className="mt-1 border-t border-slate-100 pt-1">
+              <div className="flex items-center justify-between gap-2 px-3 py-2 text-sm text-fg-muted">
+                Theme
+                <ThemeSwitcher compact />
+              </div>
+              <div className="mt-1 border-t border-line pt-1">
                 <LogoutButton variant="menu" />
               </div>
             </div>
           </div>
         ) : (
           <div className="hidden items-center gap-1 lg:flex">
+            <ThemeSwitcher compact />
             <Link href="/login" className="btn btn-ghost btn-sm min-h-10">
               Log in
             </Link>
@@ -120,14 +126,14 @@ export default function SiteNav({
             aria-expanded={mobile.open}
             aria-controls="mobile-menu"
             aria-label={mobile.open ? "Close menu" : "Open menu"}
-            className="grid h-10 w-10 place-items-center rounded-md text-slate-700 hover:bg-slate-100"
+            className="grid h-10 w-10 place-items-center rounded-md text-fg-muted hover:bg-surface-3"
           >
             <Icon name={mobile.open ? "x" : "menu"} />
           </button>
           <div
             id="mobile-menu"
             hidden={!mobile.open}
-            className="animate-fade-up absolute inset-x-0 top-full z-40 max-h-[calc(100svh-4rem)] overflow-y-auto border-b border-slate-200 bg-white px-4 pb-4 pt-2 shadow-[var(--shadow-raised)]"
+            className="animate-fade-up absolute inset-x-0 top-full z-40 max-h-[calc(100svh-4rem)] overflow-y-auto border-b border-line bg-surface px-4 pb-4 pt-2 shadow-[var(--shadow-raised)]"
           >
             <nav aria-label="Main" className="flex flex-col gap-1">
               {items.map((i) => (
@@ -137,12 +143,15 @@ export default function SiteNav({
                 </Link>
               ))}
             </nav>
-            <div className="mt-3 border-t border-slate-100 pt-3">
+            <div className="mt-3 border-t border-line px-3 pt-3">
+              <ThemeSwitcher />
+            </div>
+            <div className="mt-3 border-t border-line pt-3">
               {user ? (
                 <>
                   <p className="px-3 pb-2 text-sm">
-                    <span className="font-semibold text-slate-900">{user.name}</span>
-                    <span className="text-slate-500"> · {user.roleLabel ?? "Citizen"}</span>
+                    <span className="font-semibold text-fg">{user.name}</span>
+                    <span className="text-fg-muted"> · {user.roleLabel ?? "Citizen"}</span>
                   </p>
                   <Link href="/account" className={`${linkClass("/account")} h-11`}>
                     <Icon name="user" className="h-4.5 w-4.5" />
@@ -170,8 +179,8 @@ export default function SiteNav({
 
 function MenuLink({ href, icon, children }: { href: string; icon: IconName; children: React.ReactNode }) {
   return (
-    <Link href={href} className="flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-slate-700 hover:bg-slate-100">
-      <Icon name={icon} className="h-4.5 w-4.5 text-slate-500" />
+    <Link href={href} className="flex h-10 items-center gap-2.5 rounded-md px-3 text-sm font-medium text-fg-muted hover:bg-surface-3">
+      <Icon name={icon} className="h-4.5 w-4.5 text-fg-muted" />
       {children}
     </Link>
   );

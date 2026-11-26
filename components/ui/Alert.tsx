@@ -3,11 +3,11 @@ import Icon, { type IconName } from "./Icon";
 export type Tone = "info" | "success" | "warning" | "danger" | "neutral";
 
 const STYLE: Record<Tone, { box: string; icon: IconName }> = {
-  info: { box: "border-ink-200 bg-ink-50 text-ink-900", icon: "info" },
-  success: { box: "border-green-200 bg-green-50 text-green-900", icon: "success" },
-  warning: { box: "border-amber-200 bg-amber-50 text-amber-950", icon: "alert" },
-  danger: { box: "border-red-200 bg-red-50 text-red-800", icon: "alert" },
-  neutral: { box: "border-slate-200 bg-slate-50 text-slate-800", icon: "info" },
+  info: { box: "border-line-strong bg-accent-soft text-accent-strong", icon: "info" },
+  success: { box: "border-success-line bg-success-soft text-success", icon: "success" },
+  warning: { box: "border-warning-line bg-warning-soft text-warning", icon: "alert" },
+  danger: { box: "border-danger-line bg-danger-soft text-danger", icon: "alert" },
+  neutral: { box: "border-line bg-surface-2 text-fg", icon: "info" },
 };
 
 /**

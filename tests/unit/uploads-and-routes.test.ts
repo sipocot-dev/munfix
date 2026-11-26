@@ -106,18 +106,38 @@ describe("GET /api/cron/mail", () => {
   });
 });
 
-describe("demo accounts", () => {
-  it("are never created in production with the public default password", async () => {
-    vi.stubEnv("NODE_ENV", "production");
+describe("test accounts", () => {
+  const run = async (appUrl: string) => {
     vi.stubEnv("SEED_DEMO_ACCOUNTS", "true");
     vi.stubEnv("DEMO_PASSWORD", "");
     vi.stubEnv("SEED_ADMIN_EMAIL", "");
+    vi.stubEnv("APP_URL", appUrl);
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const sql: string[] = [];
     const client = { query: vi.fn(async (text: string) => (sql.push(text), { rows: [], rowCount: 1 })) };
     const { seedEssentials } = await import("@/lib/setup");
     await seedEssentials(client as never, () => {});
-    expect(sql.some((s) => s.includes("INSERT INTO users"))).toBe(false);
     err.mockRestore();
+    return sql.filter((s) => s.includes("INSERT INTO users")).length;
+  };
+
+  it("are never created on a real (non-local) deployment, whatever the flags say", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    expect(await run("https://munfix.bettersipocot.org")).toBe(0);
+    expect(await run("")).toBe(0);
+    vi.stubEnv("VERCEL_ENV", "production");
+    expect(await run("http://localhost:3000")).toBe(0);
+    vi.stubEnv("VERCEL_ENV", "");
+  });
+
+  it("are created (one per built-in role) on a local or CI deployment", async () => {
+    expect(await run("http://localhost:3200")).toBe(4);
+    expect(await run("http://127.0.0.1:3000")).toBe(4);
+  });
+
+  it("are recognised for the login guard", async () => {
+    const { isDemoAccount } = await import("@/lib/setup");
+    expect(isDemoAccount(" Demo.Admin@munfix.local ")).toBe(true);
+    expect(isDemoAccount("someone@munfix.local")).toBe(false);
   });
 });

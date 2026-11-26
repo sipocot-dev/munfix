@@ -8,7 +8,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { getAccount } from "@/lib/accounts";
 import { formatDate } from "@/lib/format";
 import { mailEnabled } from "@/lib/mail";
-import { isStaffRole, ROLE_DESCRIPTION, ROLE_LABEL } from "@/lib/permissions";
+import { resolveRole } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Account settings" };
@@ -21,6 +21,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const account = await getAccount(session.userId);
   if (!account) redirect("/login");
   const forced = session.mustChangePassword === true;
+  const role = await resolveRole(account.role);
   const providers = account.providers.map((p) => PROVIDER_LABEL[p] ?? p);
 
   return (
@@ -38,11 +39,11 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
         {!forced && (
           <Panel title="Profile">
             <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
-              <span className="rounded-full bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-800">{ROLE_LABEL[account.role]}</span>
-              <span className="text-slate-600">{ROLE_DESCRIPTION[account.role]}</span>
+              <span className="rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-semibold text-accent-strong">{role.name}</span>
+              <span className="text-fg-muted">{role.description}</span>
             </div>
             <ProfileForm name={account.name} />
-            {providers.length > 0 && <p className="mt-4 text-sm text-slate-600">Connected sign-in: {providers.join(", ")}</p>}
+            {providers.length > 0 && <p className="mt-4 text-sm text-fg-muted">Connected sign-in: {providers.join(", ")}</p>}
           </Panel>
         )}
 
@@ -54,12 +55,12 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
         {!forced && (
           <Panel title="Delete account" danger>
-            {isStaffRole(account.role) ? (
-              <p className="text-sm text-slate-600">Staff and administrator accounts cannot be deleted here. Ask an administrator to change your role first.</p>
+            {role.permissions.length > 0 ? (
+              <p className="text-sm text-fg-muted">Staff and administrator accounts cannot be deleted here. Ask an administrator to change your role first.</p>
             ) : (
               <DeleteAccount />
             )}
-            <p className="mt-4 text-sm text-slate-600">
+            <p className="mt-4 text-sm text-fg-muted">
               See the <Link href="/privacy" className="link">privacy policy</Link> and the <Link href="/data-deletion" className="link">data deletion instructions</Link>.
             </p>
           </Panel>
@@ -71,9 +72,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
 
 function Panel({ title, description, danger, children }: { title: string; description?: string; danger?: boolean; children: React.ReactNode }) {
   return (
-    <section className={`card p-5 sm:p-6 ${danger ? "border-red-200" : ""}`} aria-label={title}>
-      <h2 className={`text-lg font-semibold ${danger ? "text-red-800" : "text-slate-900"}`}>{title}</h2>
-      {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+    <section className={`card p-5 sm:p-6 ${danger ? "border-danger-line" : ""}`} aria-label={title}>
+      <h2 className={`text-lg font-semibold ${danger ? "text-danger" : "text-fg"}`}>{title}</h2>
+      {description && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
       <div className="mt-4">{children}</div>
     </section>
   );

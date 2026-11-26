@@ -3,8 +3,8 @@
 import type { ReportSummary } from "./reports";
 import { PUBLIC_STATUSES, type Status } from "./status";
 
-/** The map opens on reports that still need work; citizens can switch on Resolved. */
-export const DEFAULT_STATUSES: Status[] = ["verified", "in_progress"];
+/** The map opens on reports that still need work (published, under review, in progress); Resolved is one click away. */
+export const DEFAULT_STATUSES: Status[] = ["verified", "under_review", "in_progress"];
 
 export interface ExplorerFilters {
   statuses: Status[];

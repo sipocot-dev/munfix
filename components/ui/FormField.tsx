@@ -26,7 +26,7 @@ export default function FormField({
     <div className={className}>
       <label htmlFor={children.props.id ?? id} className="label">
         {label}
-        {optional && <span className="ml-1 font-normal text-slate-500">(optional)</span>}
+        {optional && <span className="ml-1 font-normal text-fg-muted">(optional)</span>}
       </label>
       <div className="mt-1.5">{control}</div>
       {hint && (

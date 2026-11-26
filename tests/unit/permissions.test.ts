@@ -1,56 +1,79 @@
 import { describe, expect, it } from "vitest";
-import { allowedTransitions, canViewUnpublished, isStaffRole, viewableStatuses } from "@/lib/permissions";
+import {
+  ALL_PERMISSIONS,
+  allowedTransitions,
+  canOpen,
+  canViewUnpublished,
+  hasWorkspace,
+  isCategoryScoped,
+  isSubset,
+  queueTabs,
+  SYSTEM_ROLES,
+  viewableStatuses,
+  WORKSPACE_AREAS,
+  type Permission,
+} from "@/lib/permissions";
 import { TRANSITIONS, type Status } from "@/lib/status";
 
-describe("allowedTransitions", () => {
-  it("gives citizens no transitions", () => {
-    expect(allowedTransitions("citizen", "submitted")).toEqual([]);
-    expect(allowedTransitions(null, "verified")).toEqual([]);
+const P = (role: keyof typeof SYSTEM_ROLES): readonly Permission[] => SYSTEM_ROLES[role].permissions;
+const FROM = Object.keys(TRANSITIONS) as Status[];
+
+describe("built-in roles keep their earlier abilities", () => {
+  it("citizens have no permissions and no workspace", () => {
+    expect(P("citizen")).toEqual([]);
+    expect(hasWorkspace(P("citizen"))).toBe(false);
+    for (const from of FROM) expect(allowedTransitions(P("citizen"), from)).toEqual([]);
   });
 
-  it("limits moderators to review decisions", () => {
-    expect(allowedTransitions("moderator", "submitted")).toEqual(["under_review", "verified", "rejected", "duplicate"]);
-    expect(allowedTransitions("moderator", "verified")).toEqual(["rejected"]);
+  it("field staff only do field work, limited to their categories, and never see private reports or reporters", () => {
+    expect(allowedTransitions(P("staff"), "verified")).toEqual(["in_progress", "resolved"]);
+    expect(allowedTransitions(P("staff"), "resolved")).toEqual(["in_progress"]);
+    expect(allowedTransitions(P("staff"), "submitted")).toEqual([]);
+    expect(isCategoryScoped(P("staff"))).toBe(true);
+    expect(canViewUnpublished(P("staff"))).toBe(false);
+    expect(P("staff")).not.toContain("reports.view_reporter");
+    expect(viewableStatuses(P("staff"))).not.toContain("hidden");
   });
 
-  it("limits field staff to in progress and resolved", () => {
-    expect(allowedTransitions("staff", "verified")).toEqual(["in_progress", "resolved"]);
-    expect(allowedTransitions("staff", "resolved")).toEqual(["in_progress"]);
-    expect(allowedTransitions("staff", "submitted")).toEqual([]);
+  it("moderators review and remove, but do not do field work or administration", () => {
+    expect(allowedTransitions(P("moderator"), "verified")).toEqual(["under_review", "rejected", "duplicate", "hidden"]);
+    expect(allowedTransitions(P("moderator"), "hidden")).toEqual(["verified"]);
+    expect(allowedTransitions(P("moderator"), "in_progress")).toEqual(["hidden"]);
+    expect(canViewUnpublished(P("moderator"))).toBe(true);
+    for (const p of ["users.manage", "roles.manage", "audit.view", "system.view", "reports.work"] as const) expect(P("moderator")).not.toContain(p);
   });
 
-  it("gives admins every legal transition", () => {
-    for (const from of Object.keys(TRANSITIONS) as Status[]) {
-      expect(allowedTransitions("admin", from)).toEqual([...TRANSITIONS[from]]);
-    }
+  it("administrators hold every permission and every legal transition", () => {
+    expect([...P("admin")].sort()).toEqual([...ALL_PERMISSIONS].sort());
+    for (const from of FROM) expect(allowedTransitions(P("admin"), from)).toEqual([...TRANSITIONS[from]]);
+    expect(isCategoryScoped(P("admin"))).toBe(false);
   });
 
-  it("never offers a transition the state machine forbids", () => {
-    for (const role of ["moderator", "staff", "admin"] as const) {
-      for (const from of Object.keys(TRANSITIONS) as Status[]) {
-        for (const to of allowedTransitions(role, from)) {
-          expect(TRANSITIONS[from]).toContain(to);
-        }
-      }
+  it("never offers a transition the state machine forbids, for any permission set", () => {
+    for (const perms of [P("citizen"), P("staff"), P("moderator"), P("admin"), ["reports.work", "reports.review"] as Permission[]]) {
+      for (const from of FROM) for (const to of allowedTransitions(perms, from)) expect(TRANSITIONS[from]).toContain(to);
     }
   });
 });
 
-describe("visibility", () => {
-  it("keeps unreviewed reports away from staff", () => {
-    expect(viewableStatuses("staff")).not.toContain("submitted");
-    expect(viewableStatuses("staff")).not.toContain("under_review");
-    expect(canViewUnpublished("staff")).toBe(false);
+describe("custom permission sets", () => {
+  it("open exactly the workspace areas they grant", () => {
+    const auditor: Permission[] = ["audit.view", "stats.view"];
+    const open = WORKSPACE_AREAS.filter((a) => canOpen(auditor, a.anyOf)).map((a) => a.href);
+    expect(open).toEqual(["/admin/overview", "/admin/audit"]);
+    expect(hasWorkspace(auditor)).toBe(false);
+    expect(queueTabs(auditor)).toEqual([]);
   });
 
-  it("lets moderators and admins see unpublished reports", () => {
-    expect(viewableStatuses("moderator")).toContain("submitted");
-    expect(canViewUnpublished("admin")).toBe(true);
+  it("review without view_private still lists only what review needs", () => {
+    expect(viewableStatuses(["reports.review"])).toContain("hidden");
   });
+});
 
-  it("treats only moderator, staff and admin as staff roles", () => {
-    expect(isStaffRole("citizen")).toBe(false);
-    expect(isStaffRole(null)).toBe(false);
-    expect(isStaffRole("staff")).toBe(true);
+describe("no-escalation helper", () => {
+  it("is a strict subset check", () => {
+    expect(isSubset(["users.manage"], ["users.manage", "roles.manage"])).toBe(true);
+    expect(isSubset(["users.manage", "roles.manage"], ["users.manage"])).toBe(false);
+    expect(isSubset([], [])).toBe(true);
   });
 });

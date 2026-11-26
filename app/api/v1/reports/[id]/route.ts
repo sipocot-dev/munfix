@@ -14,7 +14,7 @@ export const GET = route<Ctx>(async (_req, { params }) => {
   return NextResponse.json({ report });
 });
 
-/** Owner edit — allowed only while the report is still "submitted". */
+/** Owner edit: allowed until work on the report starts (CITIZEN_EDITABLE). */
 export const PATCH = route<Ctx>(async (req, { params }) => {
   const { id } = await params;
   const session = await requireUser();

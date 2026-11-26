@@ -49,10 +49,10 @@ export default function ShareReport({ title }: { title: string }) {
     <section className="card space-y-4 p-5" aria-labelledby="share-title">
       <div>
         <h2 id="share-title" className="flex items-center gap-2 text-lg font-semibold">
-          <Icon name="share" className="h-4.5 w-4.5 text-slate-500" />
+          <Icon name="share" className="h-4.5 w-4.5 text-fg-muted" />
           Share this report
         </h2>
-        <p className="mt-0.5 text-sm text-slate-600">Send it to people who can help get it fixed.</p>
+        <p className="mt-0.5 text-sm text-fg-muted">Send it to people who can help get it fixed.</p>
       </div>
 
       <ul className="grid grid-cols-4 gap-2">
@@ -63,7 +63,7 @@ export default function ShareReport({ title }: { title: string }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Share on ${t.name}`}
-              className="group flex flex-col items-center gap-1.5 rounded-lg p-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
+              className="group flex flex-col items-center gap-1.5 rounded-lg p-2 text-xs font-medium text-fg-muted transition hover:bg-surface-2"
             >
               <span
                 className="grid h-11 w-11 place-items-center rounded-full text-base font-bold text-white transition group-hover:brightness-110"
@@ -84,8 +84,8 @@ export default function ShareReport({ title }: { title: string }) {
         </button>
       )}
 
-      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5 pl-3">
-        <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Report link" className="min-w-0 flex-1 bg-transparent font-mono text-xs text-slate-600 outline-none" />
+      <div className="flex items-center gap-2 rounded-lg border border-line bg-surface-2 p-1.5 pl-3">
+        <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Report link" className="min-w-0 flex-1 bg-transparent font-mono text-xs text-fg-muted outline-none" />
         <button
           type="button"
           onClick={copy}

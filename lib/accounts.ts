@@ -4,7 +4,8 @@ import { appBaseUrl, resetEmail } from "./email-templates";
 import { HttpError } from "./errors";
 import { enqueueMail } from "./notifications";
 import { assertPasswordAcceptable, hashPassword, verifyPassword } from "./passwords";
-import { isStaffRole, type Role } from "./permissions";
+import type { Role } from "./permissions";
+import { resolveRole } from "./roles";
 import { invalidateReports } from "./cache";
 import { revokeUserSessions } from "./session";
 
@@ -98,7 +99,8 @@ export async function deleteAccount(userId: string): Promise<void> {
     const res = await client.query<{ role: Role }>("SELECT role FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE", [userId]);
     const user = res.rows[0];
     if (!user) throw new HttpError(404, "Account not found");
-    if (isStaffRole(user.role)) {
+    // Accounts whose role grants any access are staff accounts; an administrator must change the role first.
+    if ((await resolveRole(user.role)).permissions.length > 0) {
       throw new HttpError(409, "Staff and administrator accounts cannot be deleted here. Ask an administrator to change your role first.");
     }
 
