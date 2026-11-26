@@ -32,6 +32,8 @@ export default defineConfig({
     { name: "desktop", dependencies: ["setup"], use: { ...devices["Desktop Chrome"], viewport: { width: 1440, height: 900 } } },
     { name: "tablet", dependencies: ["setup"], grep: /@responsive/, use: { ...devices["Desktop Chrome"], viewport: { width: 820, height: 1180 }, hasTouch: true } },
     { name: "mobile", dependencies: ["setup"], grep: /@responsive|@mobile/, use: { ...devices["Pixel 7"] } },
+    // A short phone screen (iPhone SE size, Chromium): catches overlays covering content, which tall phones hide.
+    { name: "mobile-small", dependencies: ["setup"], grep: /@responsive/, use: { ...devices["Pixel 7"], viewport: { width: 375, height: 667 } } },
     ...(allBrowsers
       ? [
           { name: "firefox", dependencies: ["setup"], grep: /@cross-browser/, use: { ...devices["Desktop Firefox"], viewport: { width: 1280, height: 800 } } },

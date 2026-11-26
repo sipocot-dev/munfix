@@ -92,20 +92,28 @@ interface MailSummary {
   To: { Address: string }[];
 }
 
-/** Waits for an email to `to` whose subject contains `subject`, and returns its plain-text body. */
-export async function waitForMail(to: string, subject: string): Promise<{ subject: string; text: string }> {
-  let found: MailSummary | undefined;
+/**
+ * Waits for an email to `to` whose subject contains `subject` and, if given, whose text contains `contains`
+ * (several tests email the same test account, so the subject alone is not unique). Returns the text body.
+ */
+export async function waitForMail(to: string, subject: string, contains?: string): Promise<{ subject: string; text: string }> {
+  let found: { Subject: string; Text: string } | undefined;
   await expect
     .poll(
       async () => {
-        const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}`);
+        const res = await fetch(`${MAILPIT}/api/v1/search?query=${encodeURIComponent(`to:"${to}"`)}&limit=200`);
         const data = (await res.json()) as { messages: MailSummary[] };
-        found = data.messages.find((m) => m.Subject.includes(subject));
-        return Boolean(found);
+        for (const m of data.messages.filter((x) => x.Subject.includes(subject))) {
+          const msg = (await (await fetch(`${MAILPIT}/api/v1/message/${m.ID}`)).json()) as { Subject: string; Text: string };
+          if (!contains || msg.Text.includes(contains)) {
+            found = msg;
+            return true;
+          }
+        }
+        return false;
       },
-      { message: `email "${subject}" to ${to}`, timeout: 30_000, intervals: [500, 1000, 2000] },
+      { message: `email "${subject}" to ${to}${contains ? ` containing "${contains}"` : ""}`, timeout: 30_000, intervals: [500, 1000, 2000] },
     )
     .toBe(true);
-  const msg = (await (await fetch(`${MAILPIT}/api/v1/message/${found!.ID}`)).json()) as { Subject: string; Text: string };
-  return { subject: msg.Subject, text: msg.Text };
+  return { subject: found!.Subject, text: found!.Text };
 }

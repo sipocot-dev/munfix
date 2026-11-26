@@ -40,6 +40,7 @@ Environment variables the tests read: `E2E_PORT` (default 3200), `E2E_BASE_URL`,
 | `desktop` | 1440×900 Chromium | Every test |
 | `tablet` | 820×1180 Chromium, touch | Tests tagged `@responsive` |
 | `mobile` | Pixel 7 | Tests tagged `@responsive` or `@mobile` |
+| `mobile-small` | 375×667 (Chromium, touch) | Tests tagged `@responsive`: short screens, where overlays cover content |
 | `firefox`, `webkit-mobile` | Firefox 1280×800, iPhone 14 | Tests tagged `@cross-browser`; only with `E2E_ALL_BROWSERS=1` (CI sets it) |
 
 Tests that change data run on desktop only, and create their own reports and accounts through the API, so they do not depend on each other.

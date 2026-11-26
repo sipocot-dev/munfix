@@ -84,12 +84,20 @@ test.describe("map markers", { tag: ["@responsive", "@cross-browser"] }, () => {
       await page.getByRole("button", { name: "Zoom in", exact: true }).click();
       await page.waitForTimeout(500);
     }
-    const pin = page.locator(".pin").first();
+    // The worst case: the top-most visible pin (below the search bar). Its card used to open below the pin
+    // and, once the map centred it, end up under the phone's Map/List toggle.
+    const pins = page.locator(".pin");
+    const tops = await pins.evaluateAll((els) => els.map((e) => e.getBoundingClientRect().top));
+    const candidates = tops.map((top, i) => ({ top, i })).filter((p) => p.top > 80).sort((a, b) => a.top - b.top);
+    const pin = pins.nth(candidates[0]?.i ?? 0);
     if (isMobile) await pin.tap();
     else await pin.click();
     const link = page.locator(".maplibregl-popup").getByRole("link", { name: /View report/ });
     await expect(link).toBeVisible();
-    await link.click();
+    // Fully on screen and not under the floating controls: Playwright's click fails if anything covers it.
+    await expect(link).toBeInViewport({ ratio: 1 });
+    if (isMobile) await link.tap();
+    else await link.click();
     await expect(page).toHaveURL(/\/reports\/[0-9a-f-]{36}$/);
   });
 

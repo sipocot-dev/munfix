@@ -103,6 +103,7 @@ This replaces the earlier rule, which allowed them in production with a strong `
 
 - Restricted workspace pages now answer **HTTP 404**, not a streamed 200 showing the 404 page. The admin `loading.tsx` was making Next.js send the status before the permission check ran.
 - **WCAG 2.5.3 (Label in name):** the logo link and the pager buttons had `aria-label`s that did not contain their visible text, so voice-control users could not activate them by what they see. The labels were removed; the visible text is the name.
+- **Map preview covered on short phones (found by CI on WebKit / iPhone 14).** The report card could open *below* a pin. Once the map centred the pin, the "View report" link landed under the floating Map/List toggle and could not be tapped. The card is now always anchored above the pin, and the map pans the pin into the lower half of the screen. The failure did not reproduce in local Chromium, even with the worst-case pin; CI's WebKit run is what checks it. The test now picks the top-most pin and checks that the link is fully on screen before tapping. A permanent small-phone project (375×667) was added for short-screen layouts.
 - Role keys keep accented letters readable ("Peñafrancia" becomes "penafrancia", not "pen-afrancia").
 - The README claimed the seed script creates demo logins with `demo-password`. It never did (its sample accounts get random passwords). Corrected.
 
@@ -148,7 +149,7 @@ It is additive. It was checked on a fresh database (CI) and on a database with e
 | `npm test` (Vitest) | **13 files, 187 passed** (119 before this branch) |
 | `npm run build` | compiled successfully. Shared first-load JS unchanged at 103 kB |
 | `npm audit --omit=dev --audit-level=high` | 0 vulnerabilities |
-| `npm run test:e2e`, run locally (Chromium: setup, desktop, tablet, mobile; production build; PostgreSQL 17; a local Redis stand-in) | **199 passed, 5 skipped**: the 4 email tests (no Mailpit locally, see below) and the keyboard-only cluster test on the phone profile |
+| `npm run test:e2e`, run locally (Chromium: setup, desktop, tablet, mobile; production build; PostgreSQL 17; a local Redis stand-in) | **199 passed, 5 skipped**: the 4 email tests (no Mailpit locally, see below) and the keyboard-only cluster test on the phone profile. The later map fix was re-run on desktop, phone and small phone: 24 passed |
 | Accessibility (axe-core, WCAG 2.2 AA tags), part of the run above | 16 pages × light and dark × desktop and phone: **0 violations** |
 | Lint | No linter is configured in this repository; not run |
 | CI (`check` and `e2e` jobs, including Firefox, WebKit and Mailpit) | See the pull request's checks |
@@ -174,7 +175,7 @@ It is additive. It was checked on a fresh database (CI) and on a database with e
 | Theme preference | Stored per browser, not per account. Without JavaScript the light theme is used whatever the OS preference |
 | Auto-publication | Inappropriate content is public until a moderator acts; consider image screening or a per-category "review first" option if abuse appears |
 | OpenFreeMap | No SLA; the documented fallbacks are self-hosting or a keyed provider |
-| CI duration | The e2e job adds about 10 to 15 minutes; tests run serially (`workers: 1`) because they share one database |
+| CI duration | The e2e job took about 8.5 minutes on its first run; tests run serially (`workers: 1`) because they share one database |
 | Vitest advisories (dev only) | Upgrade to Vitest 4.1.12 or later in a separate PR |
 
 ## 8. Rollout

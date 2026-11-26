@@ -364,7 +364,8 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
     let cancelled = false;
     import("maplibre-gl").then(({ Popup }) => {
       if (cancelled || !mapRef.current) return;
-      const popup = new Popup({ offset: [0, -40], maxWidth: "300px", focusAfterOpen: true })
+      // Always above the pin: below it, the phone's Map/List toggle would cover the "View report" link.
+      const popup = new Popup({ anchor: "bottom", offset: [0, -40], maxWidth: "300px", focusAfterOpen: true })
         .setLngLat([report.lng, report.lat])
         .setDOMContent(previewNode(report, (href) => routerRef.current.push(href)))
         .addTo(mapRef.current);
@@ -375,7 +376,14 @@ export default function ReportsMap({ reports, categories, selectedId, highlightI
         }
       });
       popupRef.current = popup;
-      mapRef.current.easeTo({ center: [report.lng, report.lat], zoom: Math.max(mapRef.current.getZoom(), CLUSTER_MAX_ZOOM + 1), duration: 500 });
+      // Put the pin in the lower half, so the card above it clears the search bar on short phone screens.
+      const height = mapRef.current.getContainer().clientHeight;
+      mapRef.current.easeTo({
+        center: [report.lng, report.lat],
+        offset: [0, Math.round(height * 0.22)],
+        zoom: Math.max(mapRef.current.getZoom(), CLUSTER_MAX_ZOOM + 1),
+        duration: 500,
+      });
     });
     return () => {
       cancelled = true;

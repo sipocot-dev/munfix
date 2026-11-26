@@ -14,23 +14,25 @@ test.beforeAll(async () => {
 test("a new report confirms publication by email", async () => {
   const title = uniqueTitle("Email check pothole");
   await createReport(await apiAs("citizen"), title);
-  const mail = await waitForMail(ACCOUNTS.citizen, "Your report is on the public map");
-  expect(mail.text).toContain(title);
+  const mail = await waitForMail(ACCOUNTS.citizen, "Your report is on the public map", title);
+  expect(mail.text).toContain("without your name");
 });
 
 test("moderation and field work send status emails with the reason or note", async () => {
   const citizen = await apiAs("citizen");
-  const id = await createReport(citizen, uniqueTitle("Email check hidden"));
+  const hiddenTitle = uniqueTitle("Email check hidden");
+  const id = await createReport(citizen, hiddenTitle);
   await transition(await apiAs("moderator"), id, "hidden", "Shows a licence plate");
-  const hidden = await waitForMail(ACCOUNTS.citizen, "Your report was hidden");
+  const hidden = await waitForMail(ACCOUNTS.citizen, "Your report was hidden", hiddenTitle);
   expect(hidden.text).toContain("Reason: Shows a licence plate");
 
-  const id2 = await createReport(citizen, uniqueTitle("Email check resolved"));
+  const resolvedTitle = uniqueTitle("Email check resolved");
+  const id2 = await createReport(citizen, resolvedTitle);
   const staff = await apiAs("staff");
   await transition(staff, id2, "in_progress");
-  await waitForMail(ACCOUNTS.citizen, "Work has started on your report");
+  await waitForMail(ACCOUNTS.citizen, "Work has started on your report", resolvedTitle);
   await transition(staff, id2, "resolved", "Filled and levelled");
-  const resolved = await waitForMail(ACCOUNTS.citizen, "Your report was resolved");
+  const resolved = await waitForMail(ACCOUNTS.citizen, "Your report was resolved", resolvedTitle);
   expect(resolved.text).toContain("Filled and levelled");
 });
 
