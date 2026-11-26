@@ -28,6 +28,22 @@ services:
       timeout: 3s
       retries: 10
 
+  # Development mail catcher: every email the app sends lands here instead of a real inbox.
+  # SMTP on 127.0.0.1:1025, web UI on http://localhost:8025. Bound to this machine only; never deploy it.
+  # This is for email only: MunFix has no in-app notifications (see docs/mailpit.md).
+  mailpit:
+    image: axllent/mailpit:v1.34
+    ports:
+      - "127.0.0.1:1025:1025" # SMTP
+      - "127.0.0.1:8025:8025" # web UI and API
+    environment:
+      MP_MAX_MESSAGES: 500
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
   # Full stack in containers: docker compose --profile full up --build
   app:
     profiles: ["full"]
@@ -39,7 +55,9 @@ services:
         NEXT_PUBLIC_MAP_CENTER_LNG: ${NEXT_PUBLIC_MAP_CENTER_LNG:-122.9833}
         NEXT_PUBLIC_MAP_CENTER_LAT: ${NEXT_PUBLIC_MAP_CENTER_LAT:-13.7667}
         NEXT_PUBLIC_MAP_BOUNDS: ${NEXT_PUBLIC_MAP_BOUNDS:-122.70,13.50,123.25,14.05}
-        NEXT_PUBLIC_MAP_TILE_URL: ${NEXT_PUBLIC_MAP_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}
+        NEXT_PUBLIC_MAP_STYLE_URL: ${NEXT_PUBLIC_MAP_STYLE_URL:-}
+        NEXT_PUBLIC_MAP_STYLE_URL_DARK: ${NEXT_PUBLIC_MAP_STYLE_URL_DARK:-}
+        NEXT_PUBLIC_MAP_TILE_URL: ${NEXT_PUBLIC_MAP_TILE_URL:-}
     environment:
       DATABASE_URL: postgres://munfix:munfix@db:5432/munfix
       REDIS_URL: redis://redis:6379
@@ -54,14 +72,14 @@ services:
       S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
       S3_PREFIX: ${S3_PREFIX:-}
       SMTP_URL: ${SMTP_URL:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      SEED_DEMO_ACCOUNTS: ${SEED_DEMO_ACCOUNTS:-}
+      SEED_DEMO_ACCOUNTS: ${SEED_DEMO_ACCOUNTS:-true} # local only: refused unless APP_URL is localhost
       DEMO_PASSWORD: ${DEMO_PASSWORD:-}
       AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID:-}
       AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET:-}
@@ -82,6 +100,8 @@ services:
       db:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      mailpit:
         condition: service_healthy
 
 volumes:

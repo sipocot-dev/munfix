@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SYSTEM_ROLES, type SystemRole } from "@/lib/permissions";
 import type { Session } from "@/lib/session";
 import type { Status } from "@/lib/status";
 
@@ -57,7 +58,15 @@ vi.mock("@/lib/rate-limit", async () => {
 
 import { addActivity, canViewMedia, getReportDetail, transitionReport } from "@/lib/reports";
 
-const as = (role: Session["role"], userId = OTHER, extra: Partial<Session> = {}): Session => ({ userId, name: "U", role, ...extra });
+// Sessions as getSession builds them: permissions come from the role (here the built-in definitions).
+const as = (role: SystemRole, userId = OTHER, extra: Partial<Session> = {}): Session => ({
+  userId,
+  name: "U",
+  role,
+  roleName: SYSTEM_ROLES[role].name,
+  permissions: [...SYSTEM_ROLES[role].permissions],
+  ...extra,
+});
 
 beforeEach(() => {
   state.status = "submitted";
@@ -174,5 +183,51 @@ describe("feedback and follow-ups", () => {
     state.rateLimited = true;
     await expect(addActivity(REPORT, as("citizen"), "followup", "any update?")).rejects.toMatchObject({ status: 429 });
     expect(state.writes).toEqual([]);
+  });
+});
+
+describe("automatic publication and hiding", () => {
+  it("new reports are created public (status verified, published now) with a matching audit event", async () => {
+    const { createReport } = await import("@/lib/reports");
+    const inserts: string[] = [];
+    const { withTx } = await import("@/lib/db");
+    vi.mocked(withTx).mockImplementationOnce(async (fn) =>
+      fn({
+        query: async (sql: string, params?: unknown[]) => {
+          if (/^\s*INSERT/.test(sql)) inserts.push(`${sql.replace(/\s+/g, " ").trim()} ${JSON.stringify(params)}`);
+          if (/FROM categories/.test(sql)) return { rows: [{ id: 1 }], rowCount: 1 };
+          if (/FROM problem_types/.test(sql)) return { rows: [], rowCount: 0 };
+          if (/INSERT INTO reports/.test(sql)) return { rows: [{ id: REPORT }], rowCount: 1 };
+          return { rows: [], rowCount: 1 };
+        },
+      } as never),
+    );
+    await createReport(OWNER, { title: "Pothole here", description: "A deep pothole on the road", categorySlug: "roads", lat: 13.7, lng: 122.9 }, []);
+    expect(inserts[0]).toMatch(/'verified', now\(\)\)/);
+    expect(inserts.find((i) => i.includes("INSERT INTO report_events"))).toContain('null,"verified"');
+  });
+
+  it("hiding needs a reason and takes the report and its photos out of public view", async () => {
+    await expect(transitionReport(REPORT, as("moderator"), "hidden", undefined, undefined)).rejects.toMatchObject({ status: 400 });
+    state.status = "verified";
+    await expect(transitionReport(REPORT, as("moderator"), "hidden", "Shows a licence plate", undefined)).resolves.toMatchObject({ status: "hidden" });
+    state.status = "hidden";
+    expect(await getReportDetail(REPORT, null)).toBeNull();
+    expect((await canViewMedia("known.jpg", null)).allowed).toBe(false);
+    expect(await getReportDetail(REPORT, as("citizen", OWNER))).not.toBeNull();
+    expect(await getReportDetail(REPORT, as("moderator"))).not.toBeNull();
+  });
+
+  it("field staff cannot hide or restore reports", async () => {
+    state.status = "verified";
+    await expect(transitionReport(REPORT, as("staff"), "hidden", "x", undefined)).rejects.toMatchObject({ status: 403 });
+    state.status = "hidden";
+    await expect(transitionReport(REPORT, as("staff"), "verified", undefined, undefined)).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("a session with a disabled role or a temporary password has no staff rights", async () => {
+    state.status = "verified";
+    await expect(transitionReport(REPORT, as("moderator", OTHER, { permissions: [] }), "hidden", "x", undefined)).rejects.toMatchObject({ status: 403 });
+    await expect(transitionReport(REPORT, as("moderator", OTHER, { mustChangePassword: true }), "hidden", "x", undefined)).rejects.toMatchObject({ status: 403 });
   });
 });

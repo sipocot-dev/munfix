@@ -6,16 +6,19 @@ Inspired by [CitiFix](https://github.com/KishonShrill/CitiFix), rebuilt on **Nex
 
 ## How it works
 
-1. A citizen signs up, pins a problem on the map, picks a category, and attaches up to 3 photos.
-2. The report is **private** (visible only to its author and city staff) until a moderator verifies it.
-3. Moderators review, then publish (`verified`), reject (with a reason), or mark duplicates.
-4. Verified reports appear on the public map. Staff move them through `in_progress` → `resolved`, and every step shows on a public timeline.
-5. Every status change is written to an **audit log**.
+1. A resident signs up, pins a problem on the map, picks a category, and attaches up to 3 photos.
+2. The report is **public at once** on the map and in the list, without the reporter's name.
+3. Moderators check new reports. They can put one **under review** (it stays public), **hide** it (off the public map, reversible, reason required), **reject** it (final, reason required), or mark it as a **duplicate**.
+4. Field staff move reports through **in progress** to **resolved**; every step shows on the public timeline, and the reporter gets an email.
+5. Every status change, report edit, account change and role change is written to the **audit log**.
 
 ```
-submitted → under_review → verified → in_progress → resolved
-                 ↘ rejected / duplicate        (citizens can withdraw while submitted / under review)
+submit → Published (verified) → In progress → Resolved
+            ↕ Under review (still public)
+            → Hidden (private, can be restored) / Rejected / Duplicate
 ```
+
+Reporters can edit or withdraw their report until work starts. Reports filed before automatic publication that were still waiting for review stay private ("Awaiting review") until a moderator decides; see [docs/additional-enhancements-report.md](docs/additional-enhancements-report.md).
 
 ## Stack
 
@@ -24,9 +27,9 @@ submitted → under_review → verified → in_progress → resolved
 | App | Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS 4 |
 | Database | PostgreSQL 16 (`pg`, plain SQL migrations in `db/migrations`) |
 | Redis | Sessions (7-day, hashed token), read-through cache for map/stats queries, rate limiting |
-| Maps | MapLibre GL with raster tiles (OpenStreetMap by default) |
-| Auth | Email + password (bcrypt) and optional Google / Facebook sign-in, httpOnly cookie, roles: `citizen`, `admin` |
-| Email | SMTP via Nodemailer (any provider), sent from a Postgres outbox with automatic retries |
+| Maps | MapLibre GL with OpenFreeMap vector tiles (free, no API key; light and dark styles); provider configurable ([docs/map-tiles.md](docs/map-tiles.md)) |
+| Auth | Email + password (bcrypt) and optional Google / Facebook sign-in, httpOnly cookie; permission-based roles (4 built-in, plus custom roles) |
+| Email | SMTP via Nodemailer (any provider), sent from a Postgres outbox with automatic retries; Mailpit catches mail in development |
 | Photos | Validated by magic bytes; stored on local disk or any S3-compatible bucket (AWS S3, Cloudflare R2, MinIO, B2); always served through an access-checked route |
 
 Redis is an optimisation, not a dependency of correctness for reads: if it is down the cache is bypassed and the database answers directly.
@@ -37,26 +40,27 @@ Requires Node.js 22+ and Docker.
 
 ```bash
 npm install
-cp .env.example .env
-npm run services:up        # PostgreSQL + Redis
+cp .env.example .env              # local defaults: Postgres, Redis, Mailpit SMTP, test accounts on
+npm run services:up               # PostgreSQL, Redis and Mailpit
 npm run db:migrate
-SEED_DEMO=true npm run db:seed   # categories, admin account, a few demo reports
-npm run dev                # http://localhost:3000
+SEED_DEMO=true npm run db:seed    # categories, roles, test accounts, a few sample reports
+npm run dev                       # http://localhost:3000
 ```
 
-Default admin (from `.env`): `admin@munfix.local` / `change-me-please`. **Change `SEED_ADMIN_PASSWORD` before deploying.**
-`SEED_DEMO=true` adds sample reports only. Demo logins for each role (`demo.citizen@munfix.local`, `demo.moderator@…`, `demo.staff@…`) need `SEED_DEMO_ACCOUNTS=true`; their password is `DEMO_PASSWORD` (default `demo-password`, refused in production).
+- **Test accounts** (development and CI only): one per role, password `demo-password`. Log in at <http://localhost:3000/login> as `demo.citizen@munfix.local`, `demo.staff@munfix.local`, `demo.moderator@munfix.local` or `demo.admin@munfix.local`. Details, permissions and how to reset them: [docs/testing-accounts.md](docs/testing-accounts.md). They are only created when `APP_URL` is `localhost`, and login refuses them anywhere else.
+- **Email**: every email the app sends lands in Mailpit at <http://localhost:8025> ([docs/mailpit.md](docs/mailpit.md)).
+- **Theme**: Light, Dark or System, from the header (or the menu on phones). The choice is stored in the browser.
 
 ### Tests and checks
 
 ```bash
 npm run typecheck
-npm test                    # unit tests (Vitest); no database or Redis needed
+npm test                          # unit tests (Vitest); no database or Redis needed
+npm run build && npm run test:e2e # end-to-end tests (Playwright); needs services:up, db:migrate and the seed above
 npm audit --omit=dev --audit-level=high
-npm run build
 ```
 
-CI runs the same four on every pull request. The tests mock Postgres and Redis; see `tests/unit/report-access.test.ts` for the role and ownership matrix.
+CI runs all of these on every pull request; the end-to-end job uses Postgres, Redis and Mailpit service containers and also runs the map and navigation tests in Firefox and WebKit. See [docs/testing.md](docs/testing.md).
 
 Run everything in containers instead:
 
@@ -98,12 +102,13 @@ See [`.env.example`](.env.example). The `NEXT_PUBLIC_*` values are inlined at bu
 | `UPLOAD_DIR` | Photo directory for the `local` driver (use a persistent volume) |
 | `S3_BUCKET`, `S3_REGION`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_FORCE_PATH_STYLE`, `S3_PREFIX` | `s3` driver settings. R2: `S3_REGION=auto` and its account endpoint. MinIO: `S3_FORCE_PATH_STYLE=true` |
 | `AWS_ROLE_ARN` | `s3` on Vercel with the AWS integration: OIDC role instead of static keys |
-| `SEED_DEMO_ACCOUNTS`, `DEMO_PASSWORD` | Demo logins per role; in production only with a strong `DEMO_PASSWORD` |
+| `SEED_DEMO_ACCOUNTS`, `DEMO_PASSWORD` | Test accounts for every role ([docs/testing-accounts.md](docs/testing-accounts.md)); only on a local `APP_URL`, never in production |
 | `SMTP_URL` or `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS`, `MAIL_FROM` | Email notifications (see below). Unset = email disabled |
 | `OAUTH_GOOGLE_*`, `OAUTH_FACEBOOK_*` | `CLIENT_ID` / `CLIENT_SECRET` for social sign-in (see below) |
 | `NEXT_PUBLIC_MAP_CENTER_*` | Initial map center (Sipocot by default) |
 | `NEXT_PUBLIC_MAP_BOUNDS` | `minLng,minLat,maxLng,maxLat` — reports must be pinned inside this box |
-| `NEXT_PUBLIC_MAP_TILE_URL` | Tile template. The public OSM server is for development only; use a tile provider in production |
+| `NEXT_PUBLIC_MAP_STYLE_URL`, `NEXT_PUBLIC_MAP_STYLE_URL_DARK` | MapLibre style for the light and dark themes (default: OpenFreeMap liberty / fiord) |
+| `NEXT_PUBLIC_MAP_TILE_URL`, `NEXT_PUBLIC_MAP_TILE_ATTRIBUTION` | Optional raster tile service instead of a style. Never `tile.openstreetmap.org` |
 | `NEXT_PUBLIC_MAP_STYLE` | `vector` for the OpenFreeMap vector style on the explorer |
 
 The municipality is configuration, not code: change the name, province, center and bounds to deploy for another city.
@@ -127,7 +132,9 @@ Gmail only sends as the authenticated address. Use **Admin → System → Send t
 
 Set `SMTP_URL` (or `SMTP_HOST` and friends) and `MAIL_FROM`, then check it with `npm run mail:test -- you@example.com`. Any SMTP provider works: Amazon SES, Brevo, Mailgun, Resend, Gmail with an app password, and so on. With no SMTP settings, email is off and the rest of the app is unaffected.
 
-Reporters are emailed when their report is **received**, **verified**, **started**, **resolved** (or **reopened**), **rejected** (with the reason), or **merged as a duplicate**. Moving a report to "under review" sends nothing, and withdrawing sends nothing. Staff notes appear in the email. Reporters can turn emails off from **My reports**.
+Reporters are emailed when their report is **published**, **put under review**, **hidden** or **restored**, **started**, **resolved** (or **reopened**), **rejected** (with the reason), or **merged as a duplicate**. Withdrawing sends nothing. Staff notes and reasons appear in the email. Reporters can turn emails off from **My reports**. Password reset links are sent by email too.
+
+Email is MunFix's only notification channel: there are **no in-app notifications** (no bell or inbox inside the app). In development, Mailpit shows every email that would have been sent ([docs/mailpit.md](docs/mailpit.md)).
 
 How delivery works:
 - The email is written to an `email_outbox` table **in the same transaction** as the status change, so a notification is never lost and never sent for a change that rolled back.
@@ -158,14 +165,16 @@ Like CitiFix, each category has a short list of specific problems (Roads → Pot
 
 ## Roles and administrator accounts
 
-| Role | Can do |
-| --- | --- |
-| **Citizen** | Report problems, follow and withdraw their own reports, manage their account. |
-| **Moderator** | Review new reports: start review, verify & publish, reject (with reason), mark duplicate. Sees reporters and the overview. |
-| **Field staff** | Works published reports only: mark *in progress* and *resolved*. Can be limited to certain categories (none selected = all). Never sees unreviewed reports or reporter identities. |
-| **Administrator** | Everything above, plus users and roles, the audit log (reports and account changes) and the System page. |
+Access is **permission-based**: a role is a set of permissions, and every page and API checks permissions, never role names. Four built-in roles reproduce the original behaviour and cannot be changed; administrators can add **custom roles** on **Admin → Roles** ([docs/roles-and-permissions.md](docs/roles-and-permissions.md)).
 
-Every status change and account change is written to the audit log. The server enforces all of this; hiding buttons is only a convenience.
+| Built-in role | Can do |
+| --- | --- |
+| **Citizen** | Report problems, follow, edit and withdraw their own reports until work starts, manage their account. |
+| **Field staff** | Work public reports: mark *in progress* and *resolved*. Can be limited to certain categories. Never sees hidden reports or reporter identities. |
+| **Moderator** | Review reports: put under review, hide or restore, reject (with reason), mark duplicate. Sees reporters and the overview. |
+| **Administrator** | Everything above, plus users, roles and permissions, the audit log and the System page. |
+
+Guards against privilege escalation: nobody can grant, create or act on access they do not hold themselves (a user manager cannot hand out the Administrator role or reset an administrator's password); built-in roles are fixed; nobody can edit or disable the role they hold; the last active administrator cannot be demoted or disabled. Role changes and disabled roles take effect on the next request.
 
 **Administrator credentials**
 
@@ -181,10 +190,10 @@ Every status change and account change is written to the audit log. The server e
 - Administrators create moderator/staff accounts on **Admin → Users**; a one-time temporary password is shown once and must be changed at first login.
 - Safeguards: you cannot change your own role or deactivate yourself, and the last active administrator can never be demoted or disabled. Role, deactivation and password changes sign the person out everywhere immediately.
 - Citizens can reset a forgotten password by email (needs SMTP) and delete their own account (anonymised; staff accounts must be demoted first).
-- `SEED_DEMO_ACCOUNTS=true` creates demo citizen/moderator/staff logins on startup (`demo.citizen@munfix.local`, `demo.moderator@munfix.local`, `demo.staff@munfix.local`; password `DEMO_PASSWORD`, default `demo-password`). Set a custom `DEMO_PASSWORD` on a public site and deactivate them before real use (Admin → System reminds you).
-- `SEED_DEMO=true` (the seed script) also creates `demo.moderator@munfix.local` and `demo.staff@munfix.local` (password `demo-password`). Never enable it in production.
+- `SEED_DEMO_ACCOUNTS=true` creates one test account per built-in role on a **local** deployment only (see [docs/testing-accounts.md](docs/testing-accounts.md)).
+- `SEED_DEMO=true` (the seed script) adds sample reports, attributed to sample accounts with random, unpublished passwords.
 
-Pages: `/admin` (work queue), `/admin/overview` (charts), `/admin/users`, `/admin/audit`, `/admin/system` (service health, email test, exact OAuth redirect URIs), `/account`, `/forgot-password`, and the `/privacy`, `/terms`, `/data-deletion` pages that Google and Facebook require for app review.
+Pages: `/admin` (work queue), `/admin/overview` (charts), `/admin/users`, `/admin/roles`, `/admin/audit`, `/admin/system` (service health, email test, exact OAuth redirect URIs), `/account`, `/forgot-password`, and the `/privacy`, `/terms`, `/data-deletion` pages that Google and Facebook require for app review.
 
 ## API
 
@@ -192,8 +201,8 @@ All endpoints are under `/api/v1`. Errors are `{ "error": string }` (validation 
 
 **Public**
 - `GET /categories`
-- `GET /reports?bbox=minLng,minLat,maxLng,maxLat&status=verified,resolved&category=roads&limit=500` — published reports only
-- `GET /reports/:id` — public if published; otherwise only for the owner and admins
+- `GET /reports?bbox=minLng,minLat,maxLng,maxLat&status=verified,under_review,in_progress,resolved&category=roads&limit=500` — public reports only
+- `GET /reports/:id` — public unless hidden, rejected, duplicate, withdrawn or awaiting review; those only for the owner and roles with `reports.view_private`
 - `GET /media/:name` — report photos (same visibility rules as the report)
 
 **Auth**
@@ -203,12 +212,13 @@ All endpoints are under `/api/v1`. Errors are `{ "error": string }` (validation 
 **Citizen** (logged in)
 - `POST /reports` — `multipart/form-data` (`title`, `description`, `categorySlug`, `lat`, `lng`, `barangay?`, `address?`, `photos` ×3) or JSON
 - `GET /me/reports`
-- `PATCH /reports/:id` — edit while `submitted`
-- `DELETE /reports/:id` — withdraw while `submitted` / `under_review`
+- `PATCH /reports/:id` — edit until work starts (`verified`, `under_review`, `submitted`); every edit is audited
+- `DELETE /reports/:id` — withdraw until work starts
 
 **Admin**
-- `GET /admin/reports?status=submitted,under_review` — moderation queue
-- `POST /admin/reports/:id/transition` — `{ "to": "verified", "note"?, "duplicateOf"? }`
+- `GET /admin/reports?status=verified` — work queue (`reports.review` or `reports.work`)
+- `POST /admin/reports/:id/transition` — `{ "to": "hidden", "note"?, "duplicateOf"? }`; `note` required for `hidden` and `rejected`
+- `GET /admin/roles`, `POST /admin/roles`, `PATCH /admin/roles/:key` — roles and permissions (`roles.manage`; listing also `users.manage`)
 - `GET /admin/audit-logs?limit=&offset=`
 
 ## Project layout
@@ -232,6 +242,12 @@ instrumentation.ts    Starts the email retry worker with the server
 - [docs/security.md](docs/security.md): sessions, passwords, rate limits, headers, known limitations
 - [docs/operations.md](docs/operations.md): deploy and rollback, migrations, backups and restore, incidents
 - [docs/claude-audit-report.md](docs/claude-audit-report.md): November 2026 full-stack audit
+- [docs/testing.md](docs/testing.md): unit and end-to-end tests, running them locally and in CI
+- [docs/testing-accounts.md](docs/testing-accounts.md): test accounts for every role (development only)
+- [docs/roles-and-permissions.md](docs/roles-and-permissions.md): permissions, built-in and custom roles, escalation guards
+- [docs/mailpit.md](docs/mailpit.md): development email with Mailpit; email vs in-app notifications
+- [docs/map-tiles.md](docs/map-tiles.md): basemap provider evaluation and configuration
+- [docs/additional-enhancements-report.md](docs/additional-enhancements-report.md): November 2026 additions (this round)
 - [docs/frontend-enhancement-report.md](docs/frontend-enhancement-report.md): design system (tokens, components in `components/ui/`), accessibility and UI changes
 
 ## Notes

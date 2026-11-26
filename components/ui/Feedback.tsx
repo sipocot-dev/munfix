@@ -104,14 +104,14 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
         onClick={(e) => {
           if (e.target === dialog.current) settle(false);
         }}
-        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-white p-0 shadow-[var(--shadow-raised)] backdrop:bg-slate-900/50"
+        className="m-auto w-[calc(100%-2rem)] max-w-md rounded-xl bg-surface p-0 shadow-[var(--shadow-raised)] backdrop:bg-slate-900/50"
       >
         {pending && (
           <div className="p-5 sm:p-6">
-            <h2 id="confirm-title" className="text-lg font-semibold text-slate-900">
+            <h2 id="confirm-title" className="text-lg font-semibold text-fg">
               {pending.title}
             </h2>
-            {pending.body && <div className="mt-2 text-sm leading-relaxed text-slate-600">{pending.body}</div>}
+            {pending.body && <div className="mt-2 text-sm leading-relaxed text-fg-muted">{pending.body}</div>}
             <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => settle(false)} className="btn btn-secondary" autoFocus>
                 {pending.cancelLabel ?? "Cancel"}

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { readJson, requireAdmin, route } from "@/lib/api";
+import { readJson, requirePermission, route } from "@/lib/api";
 import { createUser, listUsers } from "@/lib/users";
 import { newUserSchema } from "@/lib/validation";
 
 export const GET = route(async (req) => {
-  await requireAdmin();
+  await requirePermission("users.manage");
   const sp = req.nextUrl.searchParams;
   const result = await listUsers({
     q: sp.get("q") ?? undefined,
@@ -17,7 +17,7 @@ export const GET = route(async (req) => {
 
 /** Creates an account with a one-time temporary password, returned once in the response. */
 export const POST = route(async (req) => {
-  const admin = await requireAdmin();
+  const admin = await requirePermission("users.manage");
   const input = newUserSchema.parse(await readJson(req));
   const created = await createUser(admin, input);
   return NextResponse.json(created, { status: 201 });

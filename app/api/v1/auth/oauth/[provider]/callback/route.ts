@@ -13,7 +13,8 @@ import {
   OAUTH_NEXT_COOKIE,
   resolveUser,
 } from "@/lib/oauth";
-import { isStaffRole } from "@/lib/permissions";
+import { hasWorkspace } from "@/lib/permissions";
+import { resolveRole } from "@/lib/roles";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 import { createSession } from "@/lib/session";
 
@@ -53,7 +54,8 @@ export async function GET(req: NextRequest, { params }: Ctx): Promise<Response> 
     const user = await resolveUser(provider, profile);
     await createSession({ userId: user.id, name: user.name, role: user.role });
 
-    const res = NextResponse.redirect(appUrl(isStaffRole(user.role) && next === "/" ? "/admin" : next));
+    const role = await resolveRole(user.role);
+    const res = NextResponse.redirect(appUrl(role.isActive && hasWorkspace(role.permissions) && next === "/" ? "/admin" : next));
     res.cookies.delete({ name: OAUTH_COOKIE, path: OAUTH_COOKIE_PATH });
     res.cookies.delete({ name: OAUTH_NEXT_COOKIE, path: OAUTH_COOKIE_PATH });
     return res;

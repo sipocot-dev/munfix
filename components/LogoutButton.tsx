@@ -26,11 +26,11 @@ export default function LogoutButton({ variant = "button" }: { variant?: "button
       disabled={busy}
       className={
         variant === "menu"
-          ? "flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-60"
+          ? "flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm font-medium text-fg-muted hover:bg-surface-3 disabled:opacity-60"
           : "btn btn-secondary btn-sm"
       }
     >
-      <Icon name="logout" className={variant === "menu" ? "h-4.5 w-4.5 text-slate-500" : "h-4 w-4"} />
+      <Icon name="logout" className={variant === "menu" ? "h-4.5 w-4.5 text-fg-muted" : "h-4 w-4"} />
       {busy ? "Logging out…" : "Log out"}
     </button>
   );

@@ -14,7 +14,7 @@ export default function PasswordInput(props: Omit<React.InputHTMLAttributes<HTML
         onClick={() => setVisible((v) => !v)}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}
-        className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+        className="absolute right-1.5 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-md text-fg-muted hover:bg-surface-3 hover:text-fg"
       >
         <Icon name={visible ? "eyeOff" : "eye"} className="h-4.5 w-4.5" />
       </button>

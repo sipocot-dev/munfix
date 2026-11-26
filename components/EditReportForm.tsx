@@ -18,8 +18,8 @@ interface Values {
 }
 
 /**
- * Lets the reporter correct their report until a moderator picks it up (PATCH /api/v1/reports/:id,
- * which the server allows only while the status is "submitted"). Category and location are not editable here.
+ * Lets the reporter correct their report until work starts (PATCH /api/v1/reports/:id; the server checks
+ * CITIZEN_EDITABLE and logs every edit for moderators). Category and location are not editable here.
  */
 export default function EditReportForm({ id, initial }: { id: string; initial: Values }) {
   const router = useRouter();
@@ -59,7 +59,7 @@ export default function EditReportForm({ id, initial }: { id: string; initial: V
   if (!open) {
     return (
       <div>
-        <p className="mb-3 text-sm text-slate-600">Spotted a mistake? You can edit the text until a moderator starts the review.</p>
+        <p className="mb-3 text-sm text-fg-muted">Spotted a mistake? You can edit the text until work on it starts. Changes are public at once.</p>
         <button type="button" onClick={() => setOpen(true)} className="btn btn-secondary btn-sm">
           <Icon name="edit" className="h-4 w-4" />
           Edit report

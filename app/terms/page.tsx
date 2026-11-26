@@ -16,8 +16,8 @@ export default function Page() {
 <p>By using MunFix for {M}, {P} you agree to these terms.</p>
 <ul>
 <li>Report real problems in good faith. Do not submit false, abusive, harassing or unlawful content, or personal information about others.</li>
-<li>Only upload photos you have the right to share. Photos may be shown publicly once a report is verified.</li>
-<li>City staff may verify, reject, merge or remove reports at their discretion. Submitting a report does not guarantee that work will be done or by when.</li>
+<li>Only upload photos you have the right to share. Reports, including their photos, are public as soon as you submit them.</li>
+<li>Moderators may hide, reject, merge or remove reports at their discretion. Submitting a report does not guarantee that work will be done or by when.</li>
 <li>MunFix is not an emergency service. In an emergency, contact local emergency services directly.</li>
 <li>Keep your login secure. Accounts that abuse the service may be deactivated.</li>
 <li>The service is provided as is, without warranty. Terms may change; continued use means you accept the current version.</li>

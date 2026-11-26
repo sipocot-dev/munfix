@@ -20,7 +20,7 @@ export default function Pagination({
   return (
     <nav aria-label="Pagination" className="mt-4 flex items-center justify-between gap-3">
       <PagerButton target={prev} dir="prev" />
-      <p className="text-sm text-slate-600" aria-live="polite">
+      <p className="text-sm text-fg-muted" aria-live="polite">
         {label ?? `Page ${page}`}
       </p>
       <PagerButton target={next} dir="next" />
@@ -39,17 +39,16 @@ function PagerButton({ target, dir }: { target?: Target | null; dir: "prev" | "n
         Older <Icon name="chevronRight" className="h-4 w-4" />
       </>
     );
-  const label = dir === "prev" ? "Previous page" : "Next page";
   if (!target) return <span className="btn btn-secondary btn-sm invisible" aria-hidden>{content}</span>;
   if ("href" in target) {
     return (
-      <Link href={target.href} className="btn btn-secondary btn-sm" aria-label={label} rel={dir}>
+      <Link href={target.href} className="btn btn-secondary btn-sm" rel={dir}>
         {content}
       </Link>
     );
   }
   return (
-    <button type="button" onClick={target.onClick} className="btn btn-secondary btn-sm" aria-label={label}>
+    <button type="button" onClick={target.onClick} className="btn btn-secondary btn-sm">
       {content}
     </button>
   );

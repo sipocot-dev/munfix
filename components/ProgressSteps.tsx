@@ -1,16 +1,17 @@
 import type { Status } from "@/lib/status";
 
 const STEPS: { status: Status; label: string }[] = [
-  { status: "submitted", label: "Submitted" },
-  { status: "under_review", label: "Under review" },
-  { status: "verified", label: "Verified" },
+  { status: "verified", label: "Published" },
   { status: "in_progress", label: "In progress" },
   { status: "resolved", label: "Resolved" },
 ];
 
+/** Where each status sits on the path. Under review (and legacy pre-publication reports) sit at the first step. */
+const POSITION: Partial<Record<Status, number>> = { submitted: 0, under_review: 0, verified: 0, in_progress: 1, resolved: 2 };
+
 /** Progress tracker for the normal path of a report. Each step says in text whether it is done. */
 export default function ProgressSteps({ status }: { status: Status }) {
-  const current = STEPS.findIndex((s) => s.status === status);
+  const current = POSITION[status] ?? -1;
   if (current === -1) return null;
 
   return (
@@ -20,10 +21,10 @@ export default function ProgressSteps({ status }: { status: Status }) {
         const active = i === current && status !== "resolved";
         return (
           <li key={step.status} className="relative flex flex-1 flex-col items-center text-center" aria-current={active ? "step" : undefined}>
-            {i > 0 && <span className={`absolute right-1/2 top-3.5 h-0.5 w-full ${i <= current ? "bg-ink-700" : "bg-slate-200"}`} aria-hidden />}
+            {i > 0 && <span className={`absolute right-1/2 top-3.5 h-0.5 w-full ${i <= current ? "bg-primary" : "bg-surface-3"}`} aria-hidden />}
             <span
               className={`relative z-10 grid h-7 w-7 place-items-center rounded-full text-xs font-bold ${
-                done ? "bg-ink-700 text-white" : active ? "bg-white text-ink-800 ring-2 ring-ink-700" : "bg-slate-100 text-slate-500 ring-1 ring-slate-300"
+                done ? "bg-primary text-white" : active ? "bg-surface text-accent-strong ring-2 ring-primary" : "bg-surface-3 text-fg-muted ring-1 ring-line-strong"
               }`}
               aria-hidden
             >
@@ -35,7 +36,7 @@ export default function ProgressSteps({ status }: { status: Status }) {
                 i + 1
               )}
             </span>
-            <span className={`mt-2 px-0.5 text-[11px] leading-tight sm:text-xs ${done || active ? "font-semibold text-slate-900" : "text-slate-500"}`}>
+            <span className={`mt-2 px-0.5 text-[11px] leading-tight sm:text-xs ${done || active ? "font-semibold text-fg" : "text-fg-muted"}`}>
               {step.label}
               <span className="sr-only">{done ? " (done)" : active ? " (current step)" : " (not yet)"}</span>
             </span>

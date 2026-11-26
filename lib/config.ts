@@ -25,7 +25,6 @@ export const MUNICIPALITY = {
   center,
   /** [minLng, minLat, maxLng, maxLat] */
   bounds: parseBounds(process.env.NEXT_PUBLIC_MAP_BOUNDS, center),
-  tileUrl: process.env.NEXT_PUBLIC_MAP_TILE_URL ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
 } as const;
 
 export function withinBounds(lng: number, lat: number): boolean {

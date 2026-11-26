@@ -68,7 +68,7 @@ export default function AuthForm({
         return;
       }
       if (data.mustChangePassword) router.push("/account?reason=password");
-      else router.push(["admin", "moderator", "staff"].includes(data.role) && target === "/" ? "/admin" : target);
+      else router.push(data.workspace && target === "/" ? "/admin" : target);
       router.refresh();
     } catch {
       setError("Could not reach the server. Check your connection and try again.");
@@ -89,10 +89,10 @@ export default function AuthForm({
               Continue with {p.label}
             </a>
           ))}
-          <div className="flex items-center gap-3 pt-3 text-xs font-medium uppercase tracking-wide text-slate-500">
-            <span className="h-px flex-1 bg-slate-200" />
+          <div className="flex items-center gap-3 pt-3 text-xs font-medium uppercase tracking-wide text-fg-muted">
+            <span className="h-px flex-1 bg-surface-3" />
             or with email
-            <span className="h-px flex-1 bg-slate-200" />
+            <span className="h-px flex-1 bg-surface-3" />
           </div>
         </div>
       )}
@@ -111,7 +111,7 @@ export default function AuthForm({
             <PasswordInput name="password" required minLength={isLogin ? 1 : 8} maxLength={128} autoComplete={isLogin ? "current-password" : "new-password"} />
           </FormField>
           {isLogin && (
-            <Link href="/forgot-password" className="mt-2 inline-block text-sm font-semibold text-ink-700 hover:underline">
+            <Link href="/forgot-password" className="mt-2 inline-block text-sm font-semibold text-accent hover:underline">
               Forgot your password?
             </Link>
           )}
@@ -122,13 +122,13 @@ export default function AuthForm({
           {busy ? (isLogin ? "Logging in…" : "Creating account…") : isLogin ? "Log in" : "Create account"}
         </button>
         {!isLogin && (
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-fg-muted">
             By signing up you agree to the <Link href="/terms" className="link">terms of use</Link> and the <Link href="/privacy" className="link">privacy policy</Link>.
           </p>
         )}
       </form>
 
-      <p className="mt-6 border-t border-slate-100 pt-5 text-center text-sm text-slate-600">
+      <p className="mt-6 border-t border-line pt-5 text-center text-sm text-fg-muted">
         {isLogin ? "New to MunFix? " : "Already have an account? "}
         <Link href={`${isLogin ? "/register" : "/login"}${nextQuery}`} className="link">
           {isLogin ? "Create an account" : "Log in"}

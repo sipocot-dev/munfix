@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { ZodError } from "zod";
 import { HttpError } from "./errors";
 import { logger } from "./logger";
-import type { Role } from "./permissions";
+import type { Permission } from "./permissions";
 import { getSession, type Session } from "./session";
 
 /**
@@ -71,15 +71,15 @@ export async function requireUser(opts: { allowPasswordChange?: boolean } = {}):
   return session;
 }
 
-export async function requireRole(...roles: Role[]): Promise<Session> {
+/** Requires a signed-in user holding at least one of the given permissions (from their role). */
+export async function requirePermission(...anyOf: Permission[]): Promise<Session> {
   const session = await requireUser();
-  if (!roles.includes(session.role)) throw new HttpError(403, "Forbidden");
+  if (!anyOf.some((p) => session.permissions.includes(p))) throw new HttpError(403, "Forbidden");
   return session;
 }
 
-export const requireAdmin = () => requireRole("admin");
-/** Moderators, field staff and administrators. */
-export const requireStaff = () => requireRole("moderator", "staff", "admin");
+/** The work queue: reviewers and field staff. */
+export const requireWorkspace = () => requirePermission("reports.review", "reports.work");
 
 export async function readJson(req: Request): Promise<unknown> {
   try {

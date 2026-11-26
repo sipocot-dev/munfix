@@ -7,7 +7,7 @@ import Icon from "@/components/ui/Icon";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import { query } from "@/lib/db";
-import { requirePageRole } from "@/lib/guards";
+import { requirePagePermission } from "@/lib/guards";
 import { mailEnabled } from "@/lib/mail";
 import { getPoints, listUserReports } from "@/lib/reports";
 import type { Status } from "@/lib/status";
@@ -15,7 +15,7 @@ import type { Status } from "@/lib/status";
 export const metadata: Metadata = { title: "My reports" };
 
 export default async function MyReportsPage() {
-  const session = await requirePageRole("/me");
+  const session = await requirePagePermission("/me");
   const [reports, points, prefs] = await Promise.all([
     listUserReports(session.userId),
     getPoints(session.userId),
@@ -40,8 +40,8 @@ export default async function MyReportsPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Awaiting review" value={count("submitted", "under_review")} icon="clock" accent="#6d28d9" />
-        <StatCard label="Being fixed" value={count("verified", "in_progress")} icon="refresh" accent="#1d4ed8" />
+        <StatCard label="Public, not started" value={count("verified", "under_review")} icon="map" accent="#92400e" />
+        <StatCard label="In progress" value={count("in_progress")} icon="refresh" accent="#1d4ed8" />
         <StatCard label="Resolved" value={count("resolved")} icon="check" accent="#15803d" />
         <StatCard label="Points" value={points} hint="10 for each resolved report" icon="sparkle" accent="#9a3412" />
       </div>

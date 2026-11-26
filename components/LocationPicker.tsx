@@ -118,7 +118,7 @@ export default function LocationPicker({ value, onChange }: { value: LngLat | nu
         ref={el}
         role="region"
         aria-label="Map for choosing the problem location. Click to drop a pin, or use the buttons below."
-        className="h-72 w-full overflow-hidden rounded-[10px] border border-slate-300 bg-[#e8ecef] sm:h-80"
+        className="h-72 w-full overflow-hidden rounded-[10px] border border-line-strong bg-surface-3 sm:h-80"
       />
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button type="button" onClick={useMyLocation} disabled={locating} className="btn btn-secondary btn-sm">
@@ -139,10 +139,10 @@ export default function LocationPicker({ value, onChange }: { value: LngLat | nu
           Pin map centre
         </button>
       </div>
-      <p className="mt-2 text-sm text-slate-600" aria-live="polite">
+      <p className="mt-2 text-sm text-fg-muted" aria-live="polite">
         {value ? (
           <>
-            <span className="font-semibold text-slate-800">Pin placed</span> at <span className="font-mono">{value.lat.toFixed(5)}, {value.lng.toFixed(5)}</span>. Drag it to adjust.
+            <span className="font-semibold text-fg">Pin placed</span> at <span className="font-mono">{value.lat.toFixed(5)}, {value.lng.toFixed(5)}</span>. Drag it to adjust.
           </>
         ) : (
           "No pin yet: click the map where the problem is."

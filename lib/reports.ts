@@ -4,11 +4,13 @@ import { isUuid, query, withTx } from "./db";
 import { HttpError } from "./errors";
 import { enforceRateLimit } from "./rate-limit";
 import { queueStatusEmail, triggerDrain } from "./notifications";
-import { allowedTransitions, canViewUnpublished, isStaffRole, viewableStatuses, type Role } from "./permissions";
+import { allowedTransitions, canViewUnpublished, hasWorkspace, isCategoryScoped, viewableStatuses, type Permission } from "./permissions";
 import type { Session } from "./session";
 import {
+  CITIZEN_EDITABLE,
   CITIZEN_WITHDRAWABLE,
   PUBLIC_STATUSES,
+  REASON_REQUIRED,
   TRANSITIONS,
   isPublicStatus,
   type Status,
@@ -76,6 +78,8 @@ export interface ReportDetail extends ReportSummary {
   followups: ReportNote[];
   isOwner: boolean;
   canWithdraw: boolean;
+  /** The reporter may still edit the text (until work starts). */
+  canEdit: boolean;
   /** Only populated for moderators and admins. */
   reporter?: { name: string; email: string };
   allowedTransitions?: Status[];
@@ -251,10 +255,10 @@ interface DetailRow extends SummaryRow {
   reporter_email: string;
 }
 
-/** A user still holding a temporary password has no elevated rights until they change it. */
-function effectiveRole(viewer: Session | null): Role | null {
-  if (!viewer) return null;
-  return viewer.mustChangePassword ? "citizen" : viewer.role;
+/** What the viewer may do. A user still holding a temporary password has no elevated rights until they change it. */
+function effectivePermissions(viewer: Session | null): Permission[] {
+  if (!viewer || viewer.mustChangePassword) return [];
+  return viewer.permissions ?? [];
 }
 
 /** Categories a field-staff user is limited to, or null when they cover every category. */
@@ -281,9 +285,9 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
   );
   if (!row) return null;
 
-  const role = effectiveRole(viewer);
-  const privileged = canViewUnpublished(role);
-  const staffViewer = isStaffRole(role);
+  const perms = effectivePermissions(viewer);
+  const privileged = canViewUnpublished(perms);
+  const staffViewer = hasWorkspace(perms);
   const isOwner = viewer?.userId === row.user_id;
   if (!isPublicStatus(row.status) && !isOwner && !privileged) return null;
 
@@ -300,25 +304,27 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
     created_at: Date;
     kind: string;
     actor_name: string | null;
-    actor_role: string | null;
+    actor_is_staff: boolean | null;
   }>(
-    `SELECT e.id, e.from_status, e.to_status, e.note, e.created_at, e.kind, u.name AS actor_name, u.role AS actor_role
-       FROM report_events e LEFT JOIN users u ON u.id = e.actor_id
+    // "Staff" means the actor's role carries any permission: built-in or custom, never a plain resident.
+    `SELECT e.id, e.from_status, e.to_status, e.note, e.created_at, e.kind, u.name AS actor_name,
+            cardinality(r.permissions) > 0 AS actor_is_staff
+       FROM report_events e LEFT JOIN users u ON u.id = e.actor_id LEFT JOIN roles r ON r.key = u.role
       WHERE e.report_id = $1
       ORDER BY e.created_at, e.id`,
     [id],
   );
 
   // The public only sees the part of the history that happened after publication.
-  const visibleEvents = events.filter((e) => isOwner || privileged || isPublicStatus(e.to_status));
+  const publishedAt = row.published_at?.getTime() ?? Infinity;
+  const visibleEvents = events.filter((e) => isOwner || privileged || (isPublicStatus(e.to_status) && e.created_at.getTime() >= publishedAt));
   // Staff, moderators and admins get public credit for their changes; citizens stay anonymous.
-  const publicName = (e: { actor_name: string | null; actor_role: string | null }) =>
-    e.actor_role && e.actor_role !== "citizen" ? e.actor_name : null;
+  const publicName = (e: { actor_name: string | null; actor_is_staff: boolean | null }) => (e.actor_is_staff ? e.actor_name : null);
   const note = (e: (typeof events)[number]): ReportNote => ({
     id: String(e.id),
     text: e.note ?? "",
     createdAt: e.created_at.toISOString(),
-    actorName: e.actor_role === "citizen" ? "A resident" : e.actor_name,
+    actorName: e.actor_is_staff ? e.actor_name : "A resident",
   });
 
   const detail: ReportDetail = {
@@ -342,13 +348,14 @@ export async function getReportDetail(id: string, viewer: Session | null): Promi
     followups: visibleEvents.filter((e) => e.kind === "followup").map(note),
     isOwner,
     canWithdraw: isOwner && CITIZEN_WITHDRAWABLE.includes(row.status),
+    canEdit: isOwner && CITIZEN_EDITABLE.includes(row.status),
   };
 
-  if (privileged) detail.reporter = { name: row.reporter_name, email: row.reporter_email };
+  if (perms.includes("reports.view_reporter")) detail.reporter = { name: row.reporter_name, email: row.reporter_email };
 
   if (staffViewer && viewer) {
-    let allowed = allowedTransitions(role, row.status);
-    if (role === "staff") {
+    let allowed = allowedTransitions(perms, row.status);
+    if (isCategoryScoped(perms)) {
       const scope = scopeFrom(
         await query<{ category_id: number }>("SELECT category_id FROM user_categories WHERE user_id = $1", [viewer.userId]),
       );
@@ -379,8 +386,9 @@ export async function createReport(userId: string, input: NewReport, mediaFiles:
     const problemTypeId = await resolveProblemType(client, cat.rows[0].id, input.problemTypeSlug);
 
     const res = await client.query<{ id: string }>(
-      `INSERT INTO reports (user_id, category_id, problem_type_id, title, description, lat, lng, address, barangay)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      // Published at once: moderators review public reports and can hide or reject them afterwards.
+      `INSERT INTO reports (user_id, category_id, problem_type_id, title, description, lat, lng, address, barangay, status, published_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'verified', now()) RETURNING id`,
       [userId, cat.rows[0].id, problemTypeId, input.title, input.description, input.lat, input.lng, input.address ?? null, input.barangay ?? null],
     );
     const reportId = res.rows[0].id;
@@ -388,8 +396,8 @@ export async function createReport(userId: string, input: NewReport, mediaFiles:
     for (const path of mediaFiles) {
       await client.query("INSERT INTO report_media (report_id, path) VALUES ($1, $2)", [reportId, path]);
     }
-    await insertEvent(client, reportId, userId, null, "submitted", null);
-    await queueStatusEmail(client, reportId, null, "submitted", null);
+    await insertEvent(client, reportId, userId, null, "verified", null);
+    await queueStatusEmail(client, reportId, null, "verified", null);
     return reportId;
   });
   triggerDrain();
@@ -434,7 +442,10 @@ export interface ReportEdit {
   barangay?: string;
 }
 
-/** Citizens may edit their report only until a moderator picks it up. */
+/**
+ * Reporters may edit their report until work starts. Reports are public from the start, so every edit is
+ * written to the audit log (kind "edited") for moderators, and the public caches are refreshed.
+ */
 export async function updateOwnReport(id: string, userId: string, edit: ReportEdit): Promise<void> {
   if (!isUuid(id)) throw new HttpError(404, "Report not found");
   await withTx(async (client) => {
@@ -444,7 +455,7 @@ export async function updateOwnReport(id: string, userId: string, edit: ReportEd
     );
     const row = res.rows[0];
     if (!row || row.user_id !== userId) throw new HttpError(404, "Report not found");
-    if (row.status !== "submitted") throw new HttpError(409, "This report can no longer be edited");
+    if (!CITIZEN_EDITABLE.includes(row.status)) throw new HttpError(409, "This report can no longer be edited: work on it has started or it was closed");
 
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -467,20 +478,25 @@ export async function updateOwnReport(id: string, userId: string, edit: ReportEd
 
     params.push(id);
     await client.query(`UPDATE reports SET ${sets.join(", ")}, updated_at = now() WHERE id = $${params.length}`, params);
+    await client.query(
+      "INSERT INTO report_events (report_id, actor_id, from_status, to_status, note, kind) VALUES ($1, $2, $3, $3, $4, 'edited')",
+      [id, userId, row.status, `Changed: ${Object.keys(edit).filter((k) => edit[k as keyof ReportEdit] !== undefined).join(", ")}`],
+    );
   });
+  await invalidateReports();
 }
 
 /* ----------------------------- Admin operations ----------------------------- */
 
 export async function listAdminReports(statuses: Status[], viewer: Session, limit = 200): Promise<AdminReportRow[]> {
-  const role = effectiveRole(viewer);
+  const perms = effectivePermissions(viewer);
   // Never return more than the role may see, whatever the caller asked for.
-  const visible = viewableStatuses(role);
+  const visible = viewableStatuses(perms);
   const wanted = statuses.filter((st) => visible.includes(st));
   if (wanted.length === 0) return [];
 
   const scope =
-    role === "staff"
+    isCategoryScoped(perms)
       ? scopeFrom(await query<{ category_id: number }>("SELECT category_id FROM user_categories WHERE user_id = $1", [viewer.userId]))
       : null;
 
@@ -498,8 +514,8 @@ export async function listAdminReports(statuses: Status[], viewer: Session, limi
   return rows.map((row) => ({
     ...toSummary(row),
     description: row.description,
-    reporterName: role === "staff" ? "Hidden" : row.reporter_name,
-    allowed: allowedTransitions(role, row.status),
+    reporterName: perms.includes("reports.view_reporter") ? row.reporter_name : "Hidden",
+    allowed: allowedTransitions(perms, row.status),
   }));
 }
 
@@ -525,10 +541,11 @@ export async function transitionReport(
     }
     // The state machine allows it; now check this user's role does too. The reporter may reopen their own resolved report.
     const reopenOwn = current === "resolved" && to === "in_progress" && actor.userId === res.rows[0].user_id;
-    if (!reopenOwn && !allowedTransitions(effectiveRole(actor), current).includes(to)) {
+    const actorPerms = effectivePermissions(actor);
+    if (!reopenOwn && !allowedTransitions(actorPerms, current).includes(to)) {
       throw new HttpError(403, "Your role cannot make this change");
     }
-    if (actor.role === "staff") {
+    if (!reopenOwn && isCategoryScoped(actorPerms)) {
       const scope = scopeFrom(
         (await client.query<{ category_id: number }>("SELECT category_id FROM user_categories WHERE user_id = $1", [actor.userId])).rows,
       );
@@ -536,8 +553,8 @@ export async function transitionReport(
         throw new HttpError(403, "This report is outside your assigned categories");
       }
     }
-    if (to === "rejected" && !note) {
-      throw new HttpError(400, "A reason is required when rejecting a report");
+    if (REASON_REQUIRED.includes(to) && !note) {
+      throw new HttpError(400, `A reason is required to ${to === "hidden" ? "hide" : "reject"} a report; the reporter sees it`);
     }
     if (to === "duplicate") {
       if (!duplicateOf) throw new HttpError(400, "Provide the ID of the original report");
@@ -651,7 +668,7 @@ export async function canViewMedia(
   );
   if (!row) return { allowed: false, isPublic: false };
   const isPublic = isPublicStatus(row.status);
-  const allowed = isPublic || canViewUnpublished(effectiveRole(viewer)) || viewer?.userId === row.user_id;
+  const allowed = isPublic || canViewUnpublished(effectivePermissions(viewer)) || viewer?.userId === row.user_id;
   return { allowed, isPublic };
 }
 

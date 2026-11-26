@@ -2,7 +2,9 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Pool, PoolClient } from "pg";
 import { DB_SCHEMA } from "./db";
+import { isLocalEnvironment } from "./env";
 import { hashPassword, isStrongBootstrapPassword } from "./passwords";
+import { SYSTEM_ROLES } from "./permissions";
 
 /** Arbitrary constant; serialises setup across app instances starting at the same time. */
 const SETUP_LOCK = 727274;
@@ -70,31 +72,54 @@ export async function runMigrations(client: PoolClient, log: Log = console.log):
   return ran;
 }
 
+/** Test accounts, one per built-in role (docs/testing-accounts.md). Development and CI only. */
+export const DEMO_ACCOUNTS: [email: string, name: string, role: keyof typeof SYSTEM_ROLES][] = [
+  ["demo.citizen@munfix.local", "Demo Citizen", "citizen"],
+  ["demo.staff@munfix.local", "Demo Field Staff", "staff"],
+  ["demo.moderator@munfix.local", "Demo Moderator", "moderator"],
+  ["demo.admin@munfix.local", "Demo Administrator", "admin"],
+];
+
+export function isDemoAccount(email: string): boolean {
+  const e = email.trim().toLowerCase();
+  return DEMO_ACCOUNTS.some(([d]) => d === e);
+}
+
 /**
- * Optional demo logins for trying every role (SEED_DEMO_ACCOUNTS=true). They use DEMO_PASSWORD
- * (default "demo-password"), never expire, and are listed on Admin -> System so they get removed before launch.
+ * Test accounts for every built-in role (SEED_DEMO_ACCOUNTS=true), password DEMO_PASSWORD (default
+ * "demo-password"). Only on a local or CI deployment (isLocalEnvironment): the passwords are public, so
+ * they are never created anywhere else, whatever the flags say, and login refuses them there too.
+ * Each start resets them to a known state: right role, active, known password.
  */
 async function seedDemoAccounts(client: PoolClient, log: Log): Promise<void> {
   if (process.env.SEED_DEMO_ACCOUNTS !== "true") return;
-  const password = process.env.DEMO_PASSWORD || "demo-password";
-  // The default is public (it is in this repository), and one of these logins is a moderator.
-  if (process.env.NODE_ENV === "production" && !isStrongBootstrapPassword(password)) {
-    console.error("Refusing to create demo accounts: in production DEMO_PASSWORD must be 12+ characters and not a default.");
+  if (!isLocalEnvironment()) {
+    console.error("Refusing to create test accounts: APP_URL is not a local address (localhost or 127.0.0.1).");
     return;
   }
-  const hash = await hashPassword(password);
-  const accounts: [string, string, string][] = [
-    ["demo.citizen@munfix.local", "Demo Citizen", "citizen"],
-    ["demo.moderator@munfix.local", "Demo Moderator", "moderator"],
-    ["demo.staff@munfix.local", "Demo Field Staff", "staff"],
-  ];
-  for (const [email, name, role] of accounts) {
-    const res = await client.query(
+  const hash = await hashPassword(process.env.DEMO_PASSWORD || "demo-password");
+  for (const [email, name, role] of DEMO_ACCOUNTS) {
+    await client.query(
       `INSERT INTO users (email, name, password_hash, role)
-       SELECT $1::text, $2, $3, $4 WHERE NOT EXISTS (SELECT 1 FROM users WHERE lower(email) = $1)`,
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT ((lower(email))) DO UPDATE
+         SET name = EXCLUDED.name, password_hash = EXCLUDED.password_hash, role = EXCLUDED.role,
+             is_active = true, must_change_password = false, deleted_at = NULL`,
       [email, name, hash, role],
     );
-    if (res.rowCount) log(`Created demo account ${email} (${role}).`);
+    log(`Test account ready: ${email} (${role}).`);
+  }
+}
+
+/** Built-in roles are defined in code (lib/permissions.ts) and written to the database on every start. */
+async function syncSystemRoles(client: PoolClient): Promise<void> {
+  for (const [key, def] of Object.entries(SYSTEM_ROLES)) {
+    await client.query(
+      `INSERT INTO roles (key, name, description, permissions, is_system, is_active) VALUES ($1, $2, $3, $4, true, true)
+       ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description,
+         permissions = EXCLUDED.permissions, is_system = true, is_active = true, updated_at = now()`,
+      [key, def.name, def.description, def.permissions],
+    );
   }
 }
 
@@ -119,6 +144,7 @@ export async function seedEssentials(client: PoolClient, log: Log = console.log)
       );
     }
   }
+  await syncSystemRoles(client);
   await seedDemoAccounts(client, log);
 
   const email = (process.env.SEED_ADMIN_EMAIL ?? "").trim().toLowerCase();

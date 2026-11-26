@@ -78,18 +78,18 @@ export default function AdminQueue({ initial, tabs, initialTab }: { initial: Adm
           {tabs.map((t) => (
             <button key={t.key} type="button" aria-pressed={tab === t.key} onClick={() => switchTab(t.key)} className="chip">
               {t.label}
-              {tab === t.key && !loading && <span className="rounded-full bg-white px-1.5 text-xs tabular-nums">{rows.length}</span>}
+              {tab === t.key && !loading && <span className="rounded-full bg-surface px-1.5 text-xs tabular-nums">{rows.length}</span>}
             </button>
           ))}
         </div>
         <div className="relative lg:w-72">
-          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter this list" aria-label="Filter the reports in this stage" className="field !pl-9" />
         </div>
       </div>
 
       {error && (
-        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+        <div role="alert" className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger">
           <span className="flex items-center gap-2">
             <Icon name="alert" className="h-4 w-4" />
             Could not load this stage.
@@ -132,20 +132,20 @@ export default function AdminQueue({ initial, tabs, initialTab }: { initial: Adm
               <div className="flex gap-4">
                 {r.thumb ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={r.thumb} alt="" loading="lazy" className="hidden h-24 w-24 flex-none rounded-md bg-slate-100 object-cover sm:block" />
+                  <img src={r.thumb} alt="" loading="lazy" className="hidden h-24 w-24 flex-none rounded-md bg-surface-3 object-cover sm:block" />
                 ) : (
-                  <div className="hidden h-24 w-24 flex-none place-items-center rounded-md bg-slate-100 text-slate-500 sm:grid" aria-hidden>
+                  <div className="hidden h-24 w-24 flex-none place-items-center rounded-md bg-surface-3 text-fg-muted sm:grid" aria-hidden>
                     <CategoryIcon slug={r.categorySlug} className="h-7 w-7" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-start justify-between gap-2">
-                    <Link href={`/reports/${r.id}`} className="font-semibold text-slate-900 hover:text-ink-700 hover:underline">
+                    <Link href={`/reports/${r.id}`} className="font-semibold text-fg hover:text-accent hover:underline">
                       {r.title}
                     </Link>
                     <StatusBadge status={r.status} />
                   </div>
-                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-600">
+                  <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-fg-muted">
                     <span className="inline-flex items-center gap-1">
                       <CategoryIcon slug={r.categorySlug} className="h-3.5 w-3.5" />
                       {[r.categoryName, r.problemType].filter(Boolean).join(" · ")}
@@ -168,10 +168,10 @@ export default function AdminQueue({ initial, tabs, initialTab }: { initial: Adm
                       </span>
                     )}
                   </p>
-                  <p className="mt-2 line-clamp-3 text-sm text-slate-700">{r.description}</p>
+                  <p className="mt-2 line-clamp-3 text-sm text-fg-muted">{r.description}</p>
                 </div>
               </div>
-              <div className="mt-4 border-t border-slate-100 pt-4">
+              <div className="mt-4 border-t border-line pt-4">
                 <TransitionControls id={r.id} allowed={r.allowed} onDone={(to) => moved(r.id, to)} />
               </div>
             </li>

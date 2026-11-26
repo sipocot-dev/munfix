@@ -23,3 +23,66 @@ jobs:
       - run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: munfix
+          POSTGRES_PASSWORD: munfix
+          POSTGRES_DB: munfix
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U munfix -d munfix" --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:v1.34
+        ports: ["1025:1025", "8025:8025"]
+    env:
+      # Test environment only: throwaway service containers on the runner, published test-only passwords.
+      DATABASE_URL: postgres://munfix:munfix@localhost:5432/munfix
+      REDIS_URL: redis://localhost:6379
+      APP_URL: http://localhost:3200
+      SEED_DEMO_ACCOUNTS: "true"
+      SMTP_HOST: localhost
+      SMTP_PORT: "1025"
+      MAILPIT_URL: http://localhost:8025
+      UPLOAD_DIR: ${{ github.workspace }}/uploads
+      E2E_PORT: "3200"
+      E2E_ALL_BROWSERS: "1"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run build
+      - name: Migrate and seed (categories, roles, test accounts, sample reports)
+        run: npm run db:migrate && SEED_DEMO=true npm run db:seed
+      - name: End-to-end tests (Chromium projects and WebKit)
+        run: npx playwright test --project=setup --project=desktop --project=tablet --project=mobile --project=mobile-small --project=webkit-mobile
+      - name: End-to-end tests (Firefox, headed under a virtual display for WebGL)
+        run: xvfb-run -a npx playwright test --project=setup --project=firefox
+        env:
+          E2E_HEADED_FIREFOX: "1"
+      - name: Upload report, traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14

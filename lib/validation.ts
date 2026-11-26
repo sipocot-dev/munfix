@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ROLES } from "./permissions";
 import { STATUSES } from "./status";
 
 const email = z.string().trim().toLowerCase().email().max(254);
@@ -73,17 +72,28 @@ export const deleteAccountSchema = z.object({ confirm: z.literal("DELETE") });
 export const newUserSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email,
-  role: z.enum(ROLES),
+  role: z.string().trim().min(2).max(40),
   categoryIds: z.array(z.number().int().positive()).max(50).optional(),
 });
 
 export const userPatchSchema = z
   .object({
     name: z.string().trim().min(2).max(80),
-    role: z.enum(ROLES),
+    role: z.string().trim().min(2).max(40),
     isActive: z.boolean(),
     categoryIds: z.array(z.number().int().positive()).max(50),
     resetPassword: z.literal(true),
   })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "Nothing to change");
+
+const roleName = z.string().trim().min(2, "Give the role a name of at least 2 characters").max(60);
+const roleDescription = z.string().trim().max(300);
+const permissionList = z.array(z.string().max(60)).max(40);
+
+export const newRoleSchema = z.object({ name: roleName, description: roleDescription.optional(), permissions: permissionList });
+
+export const rolePatchSchema = z
+  .object({ name: roleName, description: roleDescription, permissions: permissionList, isActive: z.boolean() })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "Nothing to change");

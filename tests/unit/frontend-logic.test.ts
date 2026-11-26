@@ -79,3 +79,20 @@ describe("map pins", () => {
     expect(svg).toContain('aria-hidden="true"');
   });
 });
+
+import { clusterLabel, clusterSize } from "@/components/ReportsMap";
+
+describe("cluster markers", () => {
+  it("keep counts short enough to fit the bubble, with the full number in the label", () => {
+    expect(clusterLabel(7)).toBe("7");
+    expect(clusterLabel(999)).toBe("999");
+    expect(clusterLabel(1000)).toBe("1k");
+    expect(clusterLabel(1234)).toBe("1.2k");
+    expect(clusterLabel(15400)).toBe("15k");
+  });
+  it("grow in steps, never below a comfortable touch target", () => {
+    expect(clusterSize(2)).toBe(36);
+    expect(clusterSize(10)).toBe(44);
+    expect(clusterSize(500)).toBe(52);
+  });
+});

@@ -27,17 +27,35 @@ interface Input {
 /** Subject, headline and body sentence for each status. Returns null for statuses that send no email. */
 function copy(i: Input): { subject: string; headline: string; body: string } | null {
   switch (i.to) {
-    case "submitted":
-      return {
-        subject: "We received your report",
-        headline: "We received your report",
-        body: "City staff will review it before it appears on the public map. We will email you when its status changes.",
-      };
     case "verified":
+      return i.from === null
+        ? {
+            subject: "Your report is on the public map",
+            headline: "Your report is published",
+            body: "Thank you. It is now on the public map (without your name), where city staff pick it up. We will email you when its status changes.",
+          }
+        : i.from === "hidden"
+          ? {
+              subject: "Your report is visible again",
+              headline: "Your report is visible again",
+              body: "A moderator restored your report to the public map.",
+            }
+          : {
+              subject: "Your report was published",
+              headline: "Your report was published",
+              body: "A moderator published your report. It is now on the public map.",
+            };
+    case "under_review":
       return {
-        subject: "Your report was verified",
-        headline: "Your report was verified",
-        body: "City staff confirmed the problem. It is now public on the map, and we will keep you posted as work progresses.",
+        subject: "A moderator is checking your report",
+        headline: "Your report is under review",
+        body: "A moderator is checking the details. It stays on the public map in the meantime.",
+      };
+    case "hidden":
+      return {
+        subject: "Your report was hidden",
+        headline: "Your report was hidden",
+        body: "A moderator took your report off the public map. You can still see it, with the reason below.",
       };
     case "in_progress":
       return i.from === "resolved"
@@ -83,7 +101,7 @@ export function statusEmail(i: Input): { subject: string; text: string; html: st
   const originalUrl = i.to === "duplicate" && i.duplicateOf ? `${base}/reports/${i.duplicateOf}` : null;
   const manageUrl = `${base}/me`;
   const color = STATUS_COLOR[i.to];
-  const noteLabel = i.to === "rejected" ? "Reason" : "Note from city staff";
+  const noteLabel = i.to === "rejected" || i.to === "hidden" ? "Reason" : "Note from city staff";
 
   const text = [
     `Hi ${i.name},`,

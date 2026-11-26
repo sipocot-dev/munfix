@@ -30,7 +30,7 @@ export default async function NewReportPage({ searchParams }: { searchParams: Pr
       <PageHeader
         back={{ href: "/", label: "Back to the map" }}
         title="Report an issue"
-        description={`Tell ${MUNICIPALITY.name} what needs fixing. Once city staff verify it, it appears on the public map and you can follow it until it is fixed.`}
+        description={`Tell ${MUNICIPALITY.name} what needs fixing. Your report goes on the public map as soon as you submit it, and you can follow it until it is fixed.`}
       />
       <ReportForm categories={categories} problemTypes={problemTypes} initialLocation={start} />
     </div>

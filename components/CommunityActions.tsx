@@ -65,7 +65,7 @@ export default function CommunityActions({ id, signedIn, canReopen, feedback, fo
       <h2 id="community-title" className="text-lg font-semibold">
         Community
       </h2>
-      <p className="mt-1 text-sm text-slate-600">Tell city staff how the fix went, or ask for another visit. Entries are public; your name is not shown.</p>
+      <p className="mt-1 text-sm text-fg-muted">Tell city staff how the fix went, or ask for another visit. Entries are public; your name is not shown.</p>
 
       <div className="mt-5 grid gap-6 md:grid-cols-2">
         <NoteThread
@@ -101,8 +101,8 @@ export default function CommunityActions({ id, signedIn, canReopen, feedback, fo
       )}
 
       {canReopen && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
-          <p className="text-sm text-slate-600">Not actually fixed?</p>
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-line pt-5">
+          <p className="text-sm text-fg-muted">Not actually fixed?</p>
           <button type="button" onClick={reopen} disabled={busy !== null} className="btn btn-secondary btn-sm">
             {busy === "reopen" ? <Spinner /> : <Icon name="refresh" className="h-4 w-4" />}
             {busy === "reopen" ? "Reopening…" : "Reopen report"}
@@ -140,19 +140,19 @@ function NoteThread({
   const fieldId = `${kind}-text`;
   return (
     <div className="flex min-w-0 flex-col">
-      <h3 className="flex items-center gap-2 font-semibold text-slate-900">
-        <Icon name="message" className="h-4.5 w-4.5 text-slate-500" />
+      <h3 className="flex items-center gap-2 font-semibold text-fg">
+        <Icon name="message" className="h-4.5 w-4.5 text-fg-muted" />
         {title}
-        <span className="rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-600">{notes.length}</span>
+        <span className="rounded-full bg-surface-3 px-2 text-xs font-semibold text-fg-muted">{notes.length}</span>
       </h3>
       {notes.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-600">{empty}</p>
+        <p className="mt-2 text-sm text-fg-muted">{empty}</p>
       ) : (
         <ul className="mt-3 max-h-72 space-y-3 overflow-y-auto pr-1">
           {notes.map((n) => (
-            <li key={n.id} className="rounded-lg bg-slate-50 px-3 py-2.5">
-              <p className="whitespace-pre-line break-words text-sm text-slate-800">{n.text}</p>
-              <p className="mt-1 text-xs text-slate-600">
+            <li key={n.id} className="rounded-lg bg-surface-2 px-3 py-2.5">
+              <p className="whitespace-pre-line break-words text-sm text-fg">{n.text}</p>
+              <p className="mt-1 text-xs text-fg-muted">
                 {n.actorName ?? "A resident"} · <time dateTime={n.createdAt}>{formatDateTime(n.createdAt)}</time>
               </p>
             </li>
@@ -177,7 +177,7 @@ function NoteThread({
           </button>
         </form>
       ) : (
-        <p className="mt-3 text-sm text-slate-600">
+        <p className="mt-3 text-sm text-fg-muted">
           <Link href={`/login?next=/reports/${id}`} className="link">
             Log in
           </Link>{" "}

@@ -3,44 +3,57 @@
 import type { Map as MlMap, StyleSpecification } from "maplibre-gl";
 import { MUNICIPALITY } from "./config";
 
-export function baseStyle(): StyleSpecification {
-  return {
-    version: 8,
-    sources: {
-      basemap: {
-        type: "raster",
-        tiles: [MUNICIPALITY.tileUrl],
-        tileSize: 256,
-        maxzoom: 19,
-        attribution: "© OpenStreetMap contributors",
-      },
-    },
-    layers: [{ id: "basemap", type: "raster", source: "basemap" }],
-  };
+/*
+ * Basemap (docs/map-tiles.md). Default: OpenFreeMap vector styles, free with no API key or request
+ * limits, OpenStreetMap data. Light uses "liberty" (readable street names for placing a pin), dark uses
+ * "fiord" (a blue-grey that stays in the brand's ink family). Any MapLibre style URL works, including a
+ * self-hosted one; NEXT_PUBLIC_MAP_TILE_URL switches to a raster tile service instead.
+ * The public tile.openstreetmap.org server is never used: its policy forbids production app traffic.
+ */
+export const MAP_STYLE_LIGHT = process.env.NEXT_PUBLIC_MAP_STYLE_URL || "https://tiles.openfreemap.org/styles/liberty";
+export const MAP_STYLE_DARK = process.env.NEXT_PUBLIC_MAP_STYLE_URL_DARK || "https://tiles.openfreemap.org/styles/fiord";
+const RASTER_TILES = process.env.NEXT_PUBLIC_MAP_TILE_URL || "";
+const RASTER_ATTRIBUTION = process.env.NEXT_PUBLIC_MAP_TILE_ATTRIBUTION || "© OpenStreetMap contributors";
+
+export type Theme = "light" | "dark";
+
+export function currentTheme(): Theme {
+  return typeof document !== "undefined" && document.documentElement.dataset.theme === "dark" ? "dark" : "light";
 }
 
-/** OpenFreeMap vector style (free, no key). Opt-in with NEXT_PUBLIC_MAP_STYLE=vector. */
-export const VECTOR_STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+/** The style to load for a theme: a raster tile service if one is configured, otherwise a vector style URL. */
+export function styleFor(theme: Theme): string | StyleSpecification {
+  if (RASTER_TILES) {
+    return {
+      version: 8,
+      sources: { basemap: { type: "raster", tiles: [RASTER_TILES], tileSize: 256, maxzoom: 19, attribution: RASTER_ATTRIBUTION } },
+      layers: [{ id: "basemap", type: "raster", source: "basemap", paint: theme === "dark" ? { "raster-brightness-max": 0.75, "raster-saturation": -0.3 } : {} }],
+    };
+  }
+  return theme === "dark" ? MAP_STYLE_DARK : MAP_STYLE_LIGHT;
+}
 
-/**
- * Raster tiles are the default because they render reliably. The vector style needs its own
- * fonts, sprites and worker-side layers, and failed silently on some browsers.
- */
-export const USE_VECTOR_MAP = process.env.NEXT_PUBLIC_MAP_STYLE === "vector";
+/** No third-party request at all: a plain background. Used when the basemap cannot be loaded, so pins still work. */
+export function fallbackStyle(theme: Theme): StyleSpecification {
+  return { version: 8, sources: {}, layers: [{ id: "background", type: "background", paint: { "background-color": theme === "dark" ? "#16233a" : "#e8ecef" } }] };
+}
+
+/** Fired on the map container when the basemap is replaced by the plain fallback. */
+export const BASEMAP_UNAVAILABLE = "munfix:basemap-unavailable";
 
 export async function createMap(
   container: HTMLElement,
-  opts: { center?: [number, number]; zoom?: number; interactive?: boolean; controls?: boolean; vector?: boolean } = {},
+  opts: { center?: [number, number]; zoom?: number; interactive?: boolean; controls?: boolean } = {},
 ): Promise<MlMap> {
   const { Map, NavigationControl, setWorkerUrl } = await import("maplibre-gl");
   // Served from public/ (copied from node_modules/maplibre-gl/dist); MapLibre 6 loads its worker from a file.
   setWorkerUrl("/maplibre-gl-worker.mjs");
   const [minLng, minLat, maxLng, maxLat] = MUNICIPALITY.bounds;
   const pad = 0.1;
-  const useVector = Boolean(opts.vector && USE_VECTOR_MAP);
+  let theme = currentTheme();
   const map = new Map({
     container,
-    style: useVector ? VECTOR_STYLE_URL : baseStyle(),
+    style: styleFor(theme),
     center: opts.center ?? MUNICIPALITY.center,
     zoom: opts.zoom ?? 11.5,
     minZoom: 9,
@@ -49,28 +62,41 @@ export async function createMap(
       [maxLng + pad, maxLat + pad],
     ],
     attributionControl: { compact: true },
-    // Shows through while tiles load, so an unloaded map is never a blank white box.
     fadeDuration: 150,
     interactive: opts.interactive ?? true,
   });
-  if (useVector) {
-    // The vector style is a third-party service. If it is slow, blocked, or has a
-    // style error, switch to the plain raster basemap so the map still loads.
-    let fell = false;
-    const fallback = () => {
-      if (fell) return;
-      fell = true;
-      map.setStyle(baseStyle());
-    };
-    const timer = setTimeout(() => {
-      if (!map.isStyleLoaded()) fallback();
-    }, 8000);
-    map.once("style.load", () => clearTimeout(timer));
-    map.on("error", (e) => {
-      const msg = String((e as unknown as { error?: Error }).error?.message ?? "");
-      if (!map.isStyleLoaded() || /Expected value|style|expression|layer/i.test(msg)) fallback();
-    });
-  }
+
+  // If the tile service is slow, blocked or broken, switch to the plain background so the map (and its pins) still work.
+  let fellBack = false;
+  const fallback = () => {
+    if (fellBack) return;
+    fellBack = true;
+    map.setStyle(fallbackStyle(theme));
+    container.dispatchEvent(new Event(BASEMAP_UNAVAILABLE));
+  };
+  const timer = setTimeout(() => {
+    if (!map.isStyleLoaded()) fallback();
+  }, 8000);
+  map.once("style.load", () => clearTimeout(timer));
+  map.on("error", (e) => {
+    const err = e as unknown as { error?: { status?: number; message?: string }; tile?: unknown; sourceId?: string };
+    // Tile errors are counted by the caller; a style that fails to load at all means no basemap.
+    if (!map.isStyleLoaded() && !err.tile) fallback();
+  });
+
+  // Follow the site theme (components/ThemeSwitcher sets data-theme on <html>). Pins are DOM markers and survive.
+  const observer = new MutationObserver(() => {
+    const next = currentTheme();
+    if (next === theme) return;
+    theme = next;
+    map.setStyle(fellBack ? fallbackStyle(theme) : styleFor(theme));
+  });
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  map.once("remove", () => {
+    observer.disconnect();
+    clearTimeout(timer);
+  });
+
   if (opts.interactive !== false && opts.controls !== false) {
     map.addControl(new NavigationControl({ showCompass: false }), "top-right");
   }

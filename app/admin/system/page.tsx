@@ -2,24 +2,24 @@ import type { Metadata } from "next";
 import TestEmailButton from "@/components/TestEmailButton";
 import Alert from "@/components/ui/Alert";
 import PageHeader from "@/components/ui/PageHeader";
-import { requirePageRole } from "@/lib/guards";
+import { requirePagePermission } from "@/lib/guards";
 import { getSystemStatus } from "@/lib/system";
 
 export const metadata: Metadata = { title: "System" };
 
 function State({ ok, children }: { ok: boolean; children: React.ReactNode }) {
   return (
-    <p className="mt-2 flex items-start gap-2 text-sm text-slate-700">
+    <p className="mt-2 flex items-start gap-2 text-sm text-fg-muted">
       <span className={`mt-1.5 h-2.5 w-2.5 flex-none rounded-full ${ok ? "bg-green-600" : "bg-red-600"}`} aria-hidden />
       <span>
-        <span className={`font-semibold ${ok ? "text-green-800" : "text-red-800"}`}>{ok ? "Working" : "Problem"}</span> · {children}
+        <span className={`font-semibold ${ok ? "text-success" : "text-danger"}`}>{ok ? "Working" : "Problem"}</span> · {children}
       </span>
     </p>
   );
 }
 
 export default async function SystemPage() {
-  await requirePageRole("/admin/system", "admin");
+  await requirePagePermission("/admin/system", "system.view");
   const s = await getSystemStatus();
 
   return (
@@ -46,7 +46,7 @@ export default async function SystemPage() {
         </section>
         <section className="card p-5">
           <h2 className="font-semibold">Photo storage</h2>
-          <p className="mt-2 text-sm text-slate-700">
+          <p className="mt-2 text-sm text-fg-muted">
             <span className="font-semibold">{s.storage.driver}</span> · {s.storage.detail}
           </p>
         </section>
@@ -61,15 +61,15 @@ export default async function SystemPage() {
 
       <section className="card mt-6 p-5 sm:p-6">
         <h2 className="text-lg font-semibold">Social sign-in</h2>
-        <p className="mt-1 text-sm text-slate-600">
-          Public site address: <code className="rounded bg-slate-100 px-1.5 py-0.5 text-[13px]">{s.appUrl}</code>. Register these exact redirect URIs in each provider&apos;s console.
+        <p className="mt-1 text-sm text-fg-muted">
+          Public site address: <code className="rounded bg-surface-3 px-1.5 py-0.5 text-[13px]">{s.appUrl}</code>. Register these exact redirect URIs in each provider&apos;s console.
         </p>
-        <ul className="mt-4 divide-y divide-slate-100">
+        <ul className="mt-4 divide-y divide-line">
           {s.providers.map((p) => (
             <li key={p.id} className="py-3 first:pt-0 last:pb-0">
               <p className="font-semibold capitalize">{p.id}</p>
               <State ok={p.configured}>{p.configured ? "Credentials set; the button shows on the log in page." : "Not configured; the button is hidden."}</State>
-              <code className="mt-2 block break-all rounded bg-slate-100 px-2 py-1.5 text-[13px]">{p.redirectUri}</code>
+              <code className="mt-2 block break-all rounded bg-surface-3 px-2 py-1.5 text-[13px]">{p.redirectUri}</code>
             </li>
           ))}
         </ul>

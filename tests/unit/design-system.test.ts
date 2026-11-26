@@ -52,3 +52,70 @@ describe("category icons", () => {
     for (const d of Object.values(CATEGORY_ICON)) expect(d).toMatch(/^[MmLlHhVvCcSsQqTtAaZz0-9.,\s-]+$/);
   });
 });
+
+/* ----------------------------- Dark theme, parsed from app/globals.css ----------------------------- */
+import { readFileSync } from "node:fs";
+import { STATUS_TEXT_DARK } from "@/lib/status";
+
+const css = readFileSync("app/globals.css", "utf8");
+function tokens(block: string): Record<string, string> {
+  return Object.fromEntries([...block.matchAll(/--color-([a-z0-9-]+):\s*(#[0-9a-f]{6})/gi)].map((m) => [m[1], m[2].toLowerCase()]));
+}
+const light = tokens(css.slice(css.indexOf("@theme"), css.indexOf(":root[data-theme=\"dark\"]")));
+const dark = { ...light, ...tokens(css.slice(css.indexOf(":root[data-theme=\"dark\"]"), css.indexOf("@layer base"))) };
+
+describe.each([
+  ["light", light],
+  ["dark", dark],
+])("%s theme tokens (WCAG 2.2 AA)", (_name, t) => {
+  it.each([
+    ["fg", "canvas"],
+    ["fg", "surface"],
+    ["fg-muted", "canvas"],
+    ["fg-muted", "surface"],
+    ["fg-muted", "surface-2"],
+    ["accent", "surface"],
+    ["accent", "canvas"],
+    ["accent-strong", "accent-soft"],
+    ["danger", "danger-soft"],
+    ["danger", "surface"],
+    ["warning", "warning-soft"],
+    ["success", "success-soft"],
+  ])("%s on %s is at least 4.5:1", (fg, bg) => {
+    expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("white button text on the primary colour is at least 4.5:1", () => {
+    expect(contrast("#ffffff", t.primary)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast("#ffffff", t["primary-hover"])).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("the focus ring and chart bars stand out from surfaces (3:1, non-text contrast)", () => {
+    expect(contrast(t.focus, t.surface)).toBeGreaterThanOrEqual(3);
+    expect(contrast(t.chart, t.surface)).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe("dark status text", () => {
+  it.each(STATUSES)("%s is readable on dark surfaces and on its badge tint", (s) => {
+    for (const bg of [dark.surface, dark["surface-2"], dark.canvas]) {
+      expect(contrast(STATUS_TEXT_DARK[s], bg)).toBeGreaterThanOrEqual(4.5);
+      // The badge tint is 10% of the status colour over the dark surface.
+      const mix = "#" + [1, 3, 5].map((i) => Math.round(parseInt(STATUS_COLOR[s].slice(i, i + 2), 16) * 0.1 + parseInt(bg.slice(i, i + 2), 16) * 0.9).toString(16).padStart(2, "0")).join("");
+      expect(contrast(STATUS_TEXT_DARK[s], mix)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+});
+
+describe("map markers (regression: hover made markers jump)", () => {
+  it("no CSS rule transforms, scales or resizes a marker root; MapLibre owns its transform", () => {
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+    const rootSelector = /^\.(pin|cluster)(\[[^\]]*\]|:[a-z-]+(\([^)]*\))?)*$/;
+    for (const [, selectors, body] of rules) {
+      for (const sel of selectors.split(",").map((s) => s.trim())) {
+        if (!rootSelector.test(sel)) continue;
+        expect(body, sel).not.toMatch(/(^|[\s;])(transform|scale|translate|rotate|width|height)\s*:/);
+      }
+    }
+  });
+});

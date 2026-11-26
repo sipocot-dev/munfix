@@ -1,20 +1,20 @@
 import AdminNav from "@/components/AdminNav";
-import { isStaffRole, ROLE_LABEL } from "@/lib/permissions";
+import { canOpen, WORKSPACE_AREAS } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
 
 /**
- * Frame for the staff workspace. Access control stays in each page (requirePageRole): a layout does not
+ * Frame for the staff workspace. Access control stays in each page (requirePagePermission): a layout does not
  * re-run on client navigation, so it must never be the only guard.
  */
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  const staff = session && isStaffRole(session.role) && !session.mustChangePassword;
+  const areas = session ? WORKSPACE_AREAS.filter((a) => canOpen(session.permissions, a.anyOf)) : [];
   return (
     <div className="container-page">
-      {staff && (
+      {session && areas.length > 0 && (
         <div className="mb-6">
-          <p className="eyebrow mb-2">Workspace · {ROLE_LABEL[session.role]}</p>
-          <AdminNav role={session.role} />
+          <p className="eyebrow mb-2">Workspace · {session.roleName}</p>
+          <AdminNav areas={areas.map((a) => a.href)} />
         </div>
       )}
       {children}

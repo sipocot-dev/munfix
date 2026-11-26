@@ -2,7 +2,8 @@ import type { PoolClient } from "pg";
 import { isUniqueViolation, isUuid, query, withTx } from "./db";
 import { HttpError } from "./errors";
 import { generatePassword, hashPassword } from "./passwords";
-import { isRole, type Role } from "./permissions";
+import { isCategoryScoped, isPermission, type Role } from "./permissions";
+import { assertAssignable, assertWithinOwnAccess } from "./roles";
 import { revokeUserSessions, type Session } from "./session";
 
 export interface UserRow {
@@ -28,7 +29,7 @@ export async function listUsers(opts: { q?: string; role?: string; limit?: numbe
   const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
   const offset = Math.max(opts.offset ?? 0, 0);
   const q = opts.q?.trim() ? `%${opts.q.trim().replace(/[%_\\]/g, "\\$&")}%` : null;
-  const role = opts.role && isRole(opts.role) ? opts.role : null;
+  const role = opts.role && /^[a-z][a-z0-9-]{1,39}$/.test(opts.role) ? opts.role : null;
 
   const where = `u.deleted_at IS NULL AND ($1::text IS NULL OR u.name ILIKE $1 OR u.email ILIKE $1) AND ($2::text IS NULL OR u.role = $2)`;
   const rows = await query<{
@@ -108,6 +109,7 @@ export interface NewUser {
 
 /** Creates an account with a one-time temporary password the admin passes on securely. */
 export async function createUser(actor: Session, input: NewUser): Promise<{ id: string; temporaryPassword: string }> {
+  const role = await assertAssignable(actor, input.role);
   const temporaryPassword = generatePassword();
   const passwordHash = await hashPassword(temporaryPassword);
   try {
@@ -117,7 +119,7 @@ export async function createUser(actor: Session, input: NewUser): Promise<{ id: 
         [input.email, input.name, passwordHash, input.role],
       );
       const userId = res.rows[0].id;
-      if (input.role === "staff") await setCategories(client, userId, input.categoryIds ?? []);
+      if (isCategoryScoped(role.permissions)) await setCategories(client, userId, input.categoryIds ?? []);
       await logAction(client, actor.userId, userId, "user_created", { role: input.role });
       return userId;
     });
@@ -147,21 +149,27 @@ export async function updateUser(actor: Session, id: string, patch: UserPatch): 
   let revoke = false;
 
   await withTx(async (client) => {
-    const res = await client.query<{ id: string; role: Role; is_active: boolean; name: string }>(
-      "SELECT id, role, is_active, name FROM users WHERE id = $1 AND deleted_at IS NULL FOR UPDATE",
+    const res = await client.query<{ id: string; role: Role; is_active: boolean; name: string; role_permissions: string[] }>(
+      `SELECT u.id, u.role, u.is_active, u.name, r.permissions AS role_permissions
+         FROM users u JOIN roles r ON r.key = u.role
+        WHERE u.id = $1 AND u.deleted_at IS NULL FOR UPDATE OF u`,
       [id],
     );
     const target = res.rows[0];
     if (!target) throw new HttpError(404, "User not found");
     const self = target.id === actor.userId;
+    // No acting on accounts with more access than you: a user manager cannot reset an administrator's password.
+    if (!self) assertWithinOwnAccess(actor, target.role_permissions, "change this account");
+    let targetPermissions = target.role_permissions.filter(isPermission);
 
     if (patch.role !== undefined && patch.role !== target.role) {
       if (self) throw new HttpError(400, "You cannot change your own role");
       if (target.role === "admin" && (await otherActiveAdmins(client, id)) === 0) {
         throw new HttpError(409, "At least one active administrator is required");
       }
+      targetPermissions = [...(await assertAssignable(actor, patch.role)).permissions];
       await client.query("UPDATE users SET role = $2 WHERE id = $1", [id, patch.role]);
-      if (patch.role !== "staff") await client.query("DELETE FROM user_categories WHERE user_id = $1", [id]);
+      if (!isCategoryScoped(targetPermissions)) await client.query("DELETE FROM user_categories WHERE user_id = $1", [id]);
       await logAction(client, actor.userId, id, "role_changed", { from: target.role, to: patch.role });
       revoke = true;
     }
@@ -185,8 +193,7 @@ export async function updateUser(actor: Session, id: string, patch: UserPatch): 
     }
 
     if (patch.categoryIds !== undefined) {
-      const role = patch.role ?? target.role;
-      if (role !== "staff") throw new HttpError(400, "Only field staff can be limited to categories");
+      if (!isCategoryScoped(targetPermissions)) throw new HttpError(400, "Only field-work roles can be limited to categories");
       await setCategories(client, id, patch.categoryIds);
       await logAction(client, actor.userId, id, "categories_changed", { categoryIds: patch.categoryIds });
     }

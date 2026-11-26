@@ -148,10 +148,10 @@ export default function ReportForm({
             {categories.map((c) => (
               <label
                 key={c.slug}
-                className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition-colors hover:border-slate-400 has-[:checked]:border-ink-700 has-[:checked]:bg-ink-50 has-[:checked]:text-ink-900 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ink-600"
+                className="flex min-h-12 cursor-pointer items-center gap-2.5 rounded-lg border border-line-strong bg-surface px-3 py-2 text-sm font-medium text-fg transition-colors hover:border-line-strong has-[:checked]:border-primary has-[:checked]:bg-accent-soft has-[:checked]:text-accent-strong has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-focus"
               >
                 <input type="radio" name="categorySlug" value={c.slug} required checked={categorySlug === c.slug} onChange={() => setCategorySlug(c.slug)} className="sr-only" />
-                <CategoryIcon slug={c.slug} className="h-5 w-5 flex-none text-ink-700" />
+                <CategoryIcon slug={c.slug} className="h-5 w-5 flex-none text-accent" />
                 <span className="leading-tight">{c.name}</span>
               </label>
             ))}
@@ -199,20 +199,20 @@ export default function ReportForm({
             {files.map((f, i) => (
               <li key={previews[i]} className="relative">
                 {f.type === "application/pdf" ? (
-                  <span className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs font-medium text-slate-700">
-                    <Icon name="file" className="h-6 w-6 text-slate-500" />
+                  <span className="flex aspect-square flex-col items-center justify-center gap-1 rounded-lg border border-line bg-surface-2 p-2 text-center text-xs font-medium text-fg-muted">
+                    <Icon name="file" className="h-6 w-6 text-fg-muted" />
                     <span className="line-clamp-2 break-all">{f.name}</span>
                   </span>
                 ) : (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={previews[i]} alt={`Selected photo ${i + 1}`} className="aspect-square w-full rounded-lg object-cover" />
                 )}
-                <span className="mt-1 block text-center text-[11px] text-slate-600">{kb(f.size)}</span>
+                <span className="mt-1 block text-center text-[11px] text-fg-muted">{kb(f.size)}</span>
                 <button
                   type="button"
                   onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
                   aria-label={`Remove ${f.type === "application/pdf" ? f.name : `photo ${i + 1}`}`}
-                  className="absolute -right-2 -top-2 grid h-8 w-8 place-items-center rounded-full bg-slate-900 text-white shadow ring-2 ring-white hover:bg-slate-700"
+                  className="absolute -right-2 -top-2 grid h-8 w-8 place-items-center rounded-full bg-slate-900 text-white shadow ring-2 ring-surface hover:bg-slate-700"
                 >
                   <Icon name="x" className="h-4 w-4" />
                 </button>
@@ -233,11 +233,11 @@ export default function ReportForm({
             />
             <label
               htmlFor="photos"
-              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center transition-colors hover:border-ink-400 hover:bg-ink-50/40 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-ink-600"
+              className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-line-strong bg-surface-2 px-4 py-8 text-center transition-colors hover:border-accent hover:bg-accent-soft/40 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-focus"
             >
-              <Icon name="camera" className="h-7 w-7 text-ink-700" />
-              <span className="font-semibold text-slate-900">{preparing ? "Preparing photos…" : files.length === 0 ? "Add photos" : "Add another photo"}</span>
-              <span id="photos-hint" className="text-sm text-slate-600">
+              <Icon name="camera" className="h-7 w-7 text-accent" />
+              <span className="font-semibold text-fg">{preparing ? "Preparing photos…" : files.length === 0 ? "Add photos" : "Add another photo"}</span>
+              <span id="photos-hint" className="text-sm text-fg-muted">
                 {files.length} of {MAX_FILES} added{total > 0 && ` · ${kb(total)} of 4 MB`}
               </span>
             </label>
@@ -250,15 +250,15 @@ export default function ReportForm({
       </div>
 
       <div className="card flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
-        <p id="report-form-intro" className="text-sm text-slate-600">
-          City staff review every report before it appears on the public map. Your name is never shown publicly.
+        <p id="report-form-intro" className="text-sm text-fg-muted">
+          Your report is public as soon as you submit it: the text, photos and location, never your name. Moderators can hide anything inappropriate.
         </p>
         <button type="submit" disabled={busy || preparing} className="btn btn-accent min-w-44 flex-none">
           {busy ? (progress !== null && progress < 100 ? `Uploading… ${progress}%` : "Saving…") : "Submit report"}
         </button>
       </div>
       {busy && progress !== null && (
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-200" role="progressbar" aria-label="Upload progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+        <div className="h-1.5 overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-label="Upload progress" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full bg-signal-600 transition-[width]" style={{ width: `${progress}%` }} />
         </div>
       )}
@@ -270,15 +270,15 @@ function Section({ n, title, description, children }: { n: number; title: string
   return (
     <section className="card p-5 sm:p-6" aria-labelledby={`step-${n}`}>
       <div className="mb-5 flex gap-3">
-        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-ink-700 text-sm font-bold text-white" aria-hidden>
+        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-primary text-sm font-bold text-white" aria-hidden>
           {n}
         </span>
         <div>
-          <h2 id={`step-${n}`} className="text-lg font-semibold text-slate-900">
+          <h2 id={`step-${n}`} className="text-lg font-semibold text-fg">
             <span className="sr-only">Step {n}: </span>
             {title}
           </h2>
-          {description && <p className="mt-0.5 text-sm text-slate-600">{description}</p>}
+          {description && <p className="mt-0.5 text-sm text-fg-muted">{description}</p>}
         </div>
       </div>
       <div className="space-y-5">{children}</div>
