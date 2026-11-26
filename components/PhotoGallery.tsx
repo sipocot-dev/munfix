@@ -29,16 +29,19 @@ export default function PhotoGallery({ photos }: { photos: Photo[] }) {
       <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         {images.map((m, i) => (
           <li key={m.id}>
-            <button type="button" onClick={() => open(i)} aria-label={`Enlarge photo ${i + 1} of ${images.length}`} className="block w-full overflow-hidden rounded-lg">
+            <button type="button" onClick={() => open(i)} aria-label={`Enlarge photo ${i + 1} of ${images.length}`} className="block w-full overflow-hidden rounded-lg bg-slate-100">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={m.url} alt="" className="aspect-square w-full object-cover transition duration-200 hover:scale-[1.03]" />
+              <img src={m.url} alt="" loading="lazy" decoding="async" className="aspect-[4/3] w-full object-cover transition duration-200 hover:scale-[1.03]" />
             </button>
           </li>
         ))}
         {pdfs.map((m) => (
           <li key={m.id}>
-            <a href={m.url} target="_blank" rel="noopener noreferrer" className="grid aspect-square w-full place-items-center rounded-lg bg-slate-100 text-sm font-semibold text-ink-700">
-              Open PDF
+            <a href={m.url} target="_blank" rel="noopener noreferrer" className="flex aspect-[4/3] w-full flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 text-sm font-semibold text-ink-700 hover:bg-slate-100">
+              <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5ZM14 3v5h5" />
+              </svg>
+              Open PDF<span className="sr-only"> (new tab)</span>
             </a>
           </li>
         ))}

@@ -2,15 +2,15 @@ import { NextResponse } from "next/server";
 import { readJson, route } from "@/lib/api";
 import { query } from "@/lib/db";
 import { HttpError } from "@/lib/errors";
-import { verifyPassword } from "@/lib/passwords";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
 import type { Role } from "@/lib/permissions";
 import { clientIp, enforceRateLimit } from "@/lib/rate-limit";
 import { createSession } from "@/lib/session";
 import { loginSchema } from "@/lib/validation";
 
-// A real bcrypt hash of a random string, compared when the email is unknown so
-// that response time doesn't reveal which emails are registered.
-const DUMMY_HASH = "$2b$10$CwTycUXWue0Thq9StjUM0uJ8nF6Y2QJ9f3vQhJw0QvB0cH1x1uYKe";
+// Compared when the email is unknown so response time doesn't reveal which emails are registered.
+// Made with hashPassword so its bcrypt cost always matches real hashes (a fixed cost-10 hash answered ~30 ms faster).
+let dummyHash: Promise<string> | undefined;
 
 export const POST = route(async (req) => {
   const input = loginSchema.parse(await readJson(req));
@@ -26,7 +26,7 @@ export const POST = route(async (req) => {
     must_change_password: boolean;
   }>("SELECT id, name, role, password_hash, is_active, must_change_password FROM users WHERE lower(email) = $1", [input.email]);
 
-  const ok = await verifyPassword(input.password, user?.password_hash ?? DUMMY_HASH);
+  const ok = await verifyPassword(input.password, user?.password_hash ?? (await (dummyHash ??= hashPassword("munfix-dummy-password"))));
   if (!user || !user.password_hash || !ok) throw new HttpError(401, "Incorrect email or password");
   // Only said after the password is right, so it does not reveal which emails exist.
   if (!user.is_active) throw new HttpError(403, "This account has been deactivated. Please contact the city administrator.");

@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "./ui/Feedback";
+import Icon from "./ui/Icon";
 
 const SITE = "MunFix Sipocot";
 
@@ -18,6 +20,7 @@ const TARGETS: Target[] = [
 export default function ShareReport({ title }: { title: string }) {
   const [url, setUrl] = useState("");
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
   const [canNative, setCanNative] = useState(false);
   const text = `${title} · ${SITE}`;
 
@@ -30,9 +33,10 @@ export default function ShareReport({ title }: { title: string }) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      toast("Link copied.");
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      setCopied(false);
+      toast("This browser could not copy. Select the link instead.", "error");
     }
   }
 
@@ -42,10 +46,13 @@ export default function ShareReport({ title }: { title: string }) {
   }
 
   return (
-    <section className="card space-y-4 p-5">
+    <section className="card space-y-4 p-5" aria-labelledby="share-title">
       <div>
-        <h2 className="text-lg font-semibold">Share this report</h2>
-        <p className="text-sm text-slate-500">Send it to people who can help get it fixed.</p>
+        <h2 id="share-title" className="flex items-center gap-2 text-lg font-semibold">
+          <Icon name="share" className="h-4.5 w-4.5 text-slate-500" />
+          Share this report
+        </h2>
+        <p className="mt-0.5 text-sm text-slate-600">Send it to people who can help get it fixed.</p>
       </div>
 
       <ul className="grid grid-cols-4 gap-2">
@@ -56,10 +63,10 @@ export default function ShareReport({ title }: { title: string }) {
               target="_blank"
               rel="noopener noreferrer"
               aria-label={`Share on ${t.name}`}
-              className="group flex flex-col items-center gap-1.5 rounded-xl p-2 text-xs font-medium text-slate-600 transition hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink-700"
+              className="group flex flex-col items-center gap-1.5 rounded-lg p-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
             >
               <span
-                className="grid h-11 w-11 place-items-center rounded-full text-base font-bold text-white shadow-sm transition duration-200 group-hover:-translate-y-0.5 group-hover:scale-105"
+                className="grid h-11 w-11 place-items-center rounded-full text-base font-bold text-white transition group-hover:brightness-110"
                 style={{ backgroundColor: t.color }}
                 aria-hidden
               >
@@ -72,20 +79,21 @@ export default function ShareReport({ title }: { title: string }) {
       </ul>
 
       {canNative && (
-        <button type="button" onClick={native} className="btn btn-secondary w-full text-sm">
+        <button type="button" onClick={native} className="btn btn-secondary btn-sm w-full">
           More ways to share…
         </button>
       )}
 
-      <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-1.5 pl-3">
+      <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5 pl-3">
         <input readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Report link" className="min-w-0 flex-1 bg-transparent font-mono text-xs text-slate-600 outline-none" />
         <button
           type="button"
           onClick={copy}
           disabled={!url}
-          className={`rounded-lg px-3 py-2 text-xs font-semibold transition ${copied ? "bg-emerald-600 text-white" : "bg-white text-slate-800 shadow-sm hover:bg-slate-100"}`}
+          className={`btn btn-sm ${copied ? "bg-green-700 text-white" : "btn-secondary"}`}
         >
-          {copied ? "Copied ✓" : "Copy link"}
+          <Icon name={copied ? "check" : "copy"} className="h-4 w-4" />
+          {copied ? "Copied" : "Copy link"}
         </button>
       </div>
     </section>

@@ -1,30 +1,38 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import ProgressSteps from "@/components/ProgressSteps";
+import CommunityActions from "@/components/CommunityActions";
+import EditReportForm from "@/components/EditReportForm";
 import LocationCard from "@/components/LocationCard";
-import ShareReport from "@/components/ShareReport";
 import PhotoGallery from "@/components/PhotoGallery";
+import ProgressSteps from "@/components/ProgressSteps";
+import ShareReport from "@/components/ShareReport";
 import StaticMap from "@/components/StaticMap";
 import StatusBadge from "@/components/StatusBadge";
 import TransitionControls from "@/components/TransitionControls";
 import WithdrawButton from "@/components/WithdrawButton";
-import CommunityActions from "@/components/CommunityActions";
+import Alert from "@/components/ui/Alert";
+import Icon, { CategoryIcon } from "@/components/ui/Icon";
 import { formatDate, formatDateTime } from "@/lib/format";
-import { getReportDetail } from "@/lib/reports";
 import { canViewUnpublished, isStaffRole } from "@/lib/permissions";
+import { getReportDetail } from "@/lib/reports";
 import { getSession } from "@/lib/session";
-import { STATUS_LABEL, isPublicStatus } from "@/lib/status";
+import { STATUS_COLOR, STATUS_HELP, STATUS_LABEL, isPublicStatus } from "@/lib/status";
 
-type Props = { params: Promise<{ id: string }> };
+type Props = { params: Promise<{ id: string }>; searchParams?: Promise<{ submitted?: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const report = await getReportDetail((await params).id, await getSession());
-  return { title: report ? report.title : "Report not found" };
+  if (!report) return { title: "Report not found" };
+  // Only public reports get a description for link previews; unpublished ones stay private.
+  return isPublicStatus(report.status)
+    ? { title: report.title, description: `${STATUS_LABEL[report.status]} · ${report.categoryName}${report.barangay ? ` · ${report.barangay}` : ""}`, openGraph: { title: report.title } }
+    : { title: report.title, robots: { index: false } };
 }
 
-export default async function ReportPage({ params }: Props) {
+export default async function ReportPage({ params, searchParams }: Props) {
   const { id } = await params;
+  const justSubmitted = (await searchParams)?.submitted === "1";
   const session = await getSession();
   const report = await getReportDetail(id, session);
   if (!report) notFound();
@@ -32,98 +40,123 @@ export default async function ReportPage({ params }: Props) {
   const privileged = canViewUnpublished(session?.role);
   const hidden = !isPublicStatus(report.status);
   const closed = report.status === "rejected" || report.status === "duplicate" || report.status === "withdrawn";
+  const staffCard = isStaffRole(session?.role) && !session?.mustChangePassword && report.allowedTransitions;
+  const where = [report.barangay, report.address].filter(Boolean).join(" · ");
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <Link href="/" className="text-sm font-semibold text-ink-700 hover:underline">
-        ← Back to map
+    <div className="container-page">
+      <Link href="/" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-ink-700 hover:text-ink-900">
+        <Icon name="arrowLeft" className="h-4 w-4" />
+        Back to the map
       </Link>
 
-      <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-        <h1 className="text-3xl font-bold tracking-tight">{report.title}</h1>
-        <StatusBadge status={report.status} />
-      </div>
-      <p className="mt-2 text-sm text-slate-500">
-        {[report.categoryName, report.problemType, report.barangay, report.address].filter(Boolean).join(" · ")} · reported {formatDate(report.createdAt)}
-        {report.resolvedAt && <> · resolved {formatDate(report.resolvedAt)}</>}
-      </p>
-
-      {hidden && !closed && (
-        <p className="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          This report is only visible to {privileged && !report.isOwner ? "you and the reporter" : "you and city staff"} until it has been verified.
+      <header className="mb-6">
+        <p className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+          <CategoryIcon slug={report.categorySlug} className="h-4.5 w-4.5" />
+          {[report.categoryName, report.problemType].filter(Boolean).join(" · ")}
         </p>
-      )}
-      {report.status === "duplicate" && (
-        <p className="mt-4 rounded-lg bg-slate-100 px-4 py-3 text-sm text-slate-700">
-          This report duplicates another one.{" "}
-          {report.duplicateOf && (
-            <Link href={`/reports/${report.duplicateOf}`} className="font-semibold text-ink-700 hover:underline">
-              View the original
-            </Link>
+        <h1 className="mt-2 text-2xl font-bold tracking-tight text-slate-900 text-balance sm:text-3xl">{report.title}</h1>
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-600">
+          <StatusBadge status={report.status} size="md" />
+          <span className="inline-flex items-center gap-1.5">
+            <Icon name="calendar" className="h-4 w-4 text-slate-500" />
+            Reported {formatDate(report.createdAt)}
+          </span>
+          {report.resolvedAt && (
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="check" className="h-4 w-4 text-green-700" />
+              Resolved {formatDate(report.resolvedAt)}
+            </span>
           )}
-        </p>
-      )}
+          {where && (
+            <span className="inline-flex items-center gap-1.5">
+              <Icon name="pin" className="h-4 w-4 text-slate-500" />
+              {where}
+            </span>
+          )}
+        </div>
+      </header>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-6">
+      <div className="space-y-3">
+        {justSubmitted && report.isOwner && (
+          <Alert tone="success" title="Thank you, your report was sent">
+            City staff will review it. You can follow its progress here and under My reports.
+          </Alert>
+        )}
+        {hidden && !closed && (
+          <Alert tone="info" live={false} title="Not public yet">
+            Only {privileged && !report.isOwner ? "you, other moderators and the reporter" : "you and city staff"} can see this report until it is verified.
+          </Alert>
+        )}
+        {report.status === "duplicate" && (
+          <Alert tone="neutral" live={false} title="Merged into another report">
+            {report.duplicateOf ? (
+              <>
+                Follow the{" "}
+                <Link href={`/reports/${report.duplicateOf}`} className="font-semibold underline">
+                  original report
+                </Link>{" "}
+                for updates.
+              </>
+            ) : (
+              "Another report already covers this problem."
+            )}
+          </Alert>
+        )}
+        {report.status === "rejected" && (
+          <Alert tone="neutral" live={false} title="Not accepted">
+            The reason is in the timeline below.
+          </Alert>
+        )}
+        {report.status === "withdrawn" && <Alert tone="neutral" live={false} title="Withdrawn by the reporter" />}
+      </div>
+
+      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-6">
           {!closed && (
-            <section className="card p-5">
+            <section className="card p-5 sm:p-6" aria-labelledby="progress-title">
+              <h2 id="progress-title" className="sr-only">
+                Progress
+              </h2>
               <ProgressSteps status={report.status} />
+              <p className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <span className="font-semibold">{STATUS_LABEL[report.status]}:</span> {STATUS_HELP[report.status]}
+              </p>
             </section>
           )}
 
-          <section className="card p-5">
-            <h2 className="text-lg font-semibold">Details</h2>
-            <p className="mt-2 whitespace-pre-line text-slate-700">{report.description}</p>
+          <section className="card p-5 sm:p-6">
+            <h2 className="text-lg font-semibold">What was reported</h2>
+            <p className="mt-2 whitespace-pre-line leading-relaxed text-slate-700">{report.description}</p>
             {report.media.length > 0 && <PhotoGallery photos={report.media} />}
           </section>
 
-          <section className="card p-5">
+          <section className="card p-5 sm:p-6">
             <h2 className="text-lg font-semibold">Timeline</h2>
             {report.events.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No updates yet.</p>
+              <p className="mt-2 text-sm text-slate-600">No updates yet.</p>
             ) : (
-              <ol className="mt-4 space-y-5 border-l-2 border-slate-200 pl-5">
-                {report.events.map((e) => (
-                  <li key={e.id} className="relative">
-                    <span className="absolute -left-[1.62rem] top-1.5 h-2.5 w-2.5 rounded-full bg-ink-600 ring-4 ring-white" aria-hidden />
-                    <p className="font-semibold">{STATUS_LABEL[e.toStatus]}</p>
-                    <p className="text-xs text-slate-500">
-                      {formatDateTime(e.createdAt)}
-                      {e.actorName && <> · {e.actorName}</>}
-                    </p>
-                    {e.note && <p className="mt-1 text-sm text-slate-700">{e.note}</p>}
+              <ol className="mt-5 space-y-6">
+                {report.events.map((e, i) => (
+                  <li key={e.id} className="relative flex gap-4">
+                    {i < report.events.length - 1 && <span className="absolute left-[11px] top-7 h-[calc(100%+0.5rem)] w-0.5 bg-slate-200" aria-hidden />}
+                    <span className="relative mt-0.5 grid h-6 w-6 flex-none place-items-center rounded-full ring-4 ring-white" style={{ backgroundColor: STATUS_COLOR[e.toStatus] }} aria-hidden>
+                      <span className="h-2 w-2 rounded-full bg-white" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{STATUS_LABEL[e.toStatus]}</p>
+                      <p className="text-sm text-slate-600">
+                        <time dateTime={e.createdAt}>{formatDateTime(e.createdAt)}</time>
+                        {e.actorName && <> · {e.actorName}</>}
+                      </p>
+                      {e.note && <p className="mt-1.5 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">{e.note}</p>}
+                    </div>
                   </li>
                 ))}
               </ol>
             )}
           </section>
-        </div>
 
-        <aside className="space-y-6">
-          <StaticMap lng={report.lng} lat={report.lat} status={report.status} />
-          <LocationCard lat={report.lat} lng={report.lng} address={report.address} />
-          <ShareReport title={report.title} />
-
-          {isStaffRole(session?.role) && report.allowedTransitions && (
-            <section className="card space-y-3 p-5">
-              <h2 className="text-lg font-semibold">{session?.role === "staff" ? "Field work" : "Moderation"}</h2>
-              {report.reporter && (
-                <p className="text-sm text-slate-600">
-                  Reported by <span className="font-medium">{report.reporter.name}</span> ({report.reporter.email})
-                </p>
-              )}
-              <TransitionControls id={report.id} allowed={report.allowedTransitions} />
-            </section>
-          )}
-
-          {report.canWithdraw && (
-            <section className="card space-y-2 p-5">
-              <h2 className="text-lg font-semibold">Your report</h2>
-              <p className="text-sm text-slate-600">You can withdraw this report while it is still being reviewed.</p>
-              <WithdrawButton id={report.id} />
-            </section>
-          )}
           <CommunityActions
             id={report.id}
             signedIn={Boolean(session)}
@@ -131,6 +164,55 @@ export default async function ReportPage({ params }: Props) {
             feedback={report.feedback}
             followups={report.followups}
           />
+        </div>
+
+        <aside className="min-w-0 space-y-6">
+          {staffCard && (
+            <section className="card border-ink-200 p-5" aria-labelledby="staff-title">
+              <h2 id="staff-title" className="flex items-center gap-2 text-lg font-semibold">
+                <Icon name="shield" className="h-5 w-5 text-ink-700" />
+                {session?.role === "staff" ? "Field work" : "Moderation"}
+              </h2>
+              {report.reporter && (
+                <p className="mt-2 text-sm text-slate-600">
+                  Reported by <span className="font-semibold text-slate-800">{report.reporter.name}</span>
+                  <br />
+                  <a href={`mailto:${report.reporter.email}`} className="link break-all font-normal">
+                    {report.reporter.email}
+                  </a>
+                </p>
+              )}
+              <div className="mt-4">
+                <TransitionControls id={report.id} allowed={report.allowedTransitions!} />
+              </div>
+            </section>
+          )}
+
+          {report.isOwner && (report.canWithdraw || report.status === "submitted") && (
+            <section className="card space-y-4 p-5" aria-labelledby="owner-title">
+              <h2 id="owner-title" className="text-lg font-semibold">
+                Your report
+              </h2>
+              {report.status === "submitted" && (
+                <EditReportForm
+                  id={report.id}
+                  initial={{ title: report.title, description: report.description, address: report.address ?? "", barangay: report.barangay ?? "" }}
+                />
+              )}
+              {report.canWithdraw && (
+                <div className="border-t border-slate-100 pt-4">
+                  <p className="mb-3 text-sm text-slate-600">You can withdraw this report while it is still being reviewed.</p>
+                  <WithdrawButton id={report.id} />
+                </div>
+              )}
+            </section>
+          )}
+
+          <div className="space-y-3">
+            <StaticMap lng={report.lng} lat={report.lat} status={report.status} />
+            <LocationCard lat={report.lat} lng={report.lng} address={report.address} />
+          </div>
+          {!hidden && <ShareReport title={report.title} />}
         </aside>
       </div>
     </div>

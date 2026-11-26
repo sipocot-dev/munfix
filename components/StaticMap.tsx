@@ -35,5 +35,5 @@ export default function StaticMap({ lng, lat, status }: { lng: number; lat: numb
     };
   }, [lng, lat, status]);
 
-  return <div ref={el} className="h-64 w-full overflow-hidden rounded-xl border border-slate-200" />;
+  return <div ref={el} role="region" aria-label="Map showing where the problem is" className="h-56 w-full overflow-hidden rounded-[10px] border border-slate-200 bg-[#e8ecef]" />;
 }

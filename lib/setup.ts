@@ -77,6 +77,11 @@ export async function runMigrations(client: PoolClient, log: Log = console.log):
 async function seedDemoAccounts(client: PoolClient, log: Log): Promise<void> {
   if (process.env.SEED_DEMO_ACCOUNTS !== "true") return;
   const password = process.env.DEMO_PASSWORD || "demo-password";
+  // The default is public (it is in this repository), and one of these logins is a moderator.
+  if (process.env.NODE_ENV === "production" && !isStrongBootstrapPassword(password)) {
+    console.error("Refusing to create demo accounts: in production DEMO_PASSWORD must be 12+ characters and not a default.");
+    return;
+  }
   const hash = await hashPassword(password);
   const accounts: [string, string, string][] = [
     ["demo.citizen@munfix.local", "Demo Citizen", "citizen"],
@@ -158,6 +163,9 @@ export async function ensureMigrated(pool: Pool, log: Log = console.log): Promis
   const client = await pool.connect();
   try {
     await client.query("SELECT pg_advisory_lock($1)", [SETUP_LOCK]);
+    // Same as ensureDatabaseReady: on a fresh database the schema does not exist yet, and every
+    // migration would fail with "no schema has been selected to create in".
+    await client.query(`CREATE SCHEMA IF NOT EXISTS ${DB_SCHEMA}`);
     return await runMigrations(client, log);
   } finally {
     await client.query("SELECT pg_advisory_unlock($1)", [SETUP_LOCK]).catch(() => {});

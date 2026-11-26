@@ -6,10 +6,36 @@ import { logger } from "./logger";
 import type { Role } from "./permissions";
 import { getSession, type Session } from "./session";
 
+/**
+ * SameSite=lax still sends the session cookie on requests from sibling subdomains (same site), so a
+ * browser write must also come from this origin. Requests without Origin are not from a browser page.
+ */
+export function assertSameOrigin(req: Request): void {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return;
+  const origin = req.headers.get("origin");
+  if (!origin) return;
+  let host: string;
+  try {
+    host = new URL(origin).host;
+  } catch {
+    throw new HttpError(403, "Cross-site request blocked");
+  }
+  const appHost = (() => {
+    try {
+      return new URL(process.env.APP_URL ?? "").host;
+    } catch {
+      return null;
+    }
+  })();
+  const requestHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (host !== appHost && host !== requestHost) throw new HttpError(403, "Cross-site request blocked");
+}
+
 /** Wraps a route handler with uniform error handling. */
 export function route<C = unknown>(fn: (req: NextRequest, ctx: C) => Promise<Response>) {
   return async (req: NextRequest, ctx: C): Promise<Response> => {
     try {
+      assertSameOrigin(req);
       return await fn(req, ctx);
     } catch (err) {
       if (err instanceof HttpError) {

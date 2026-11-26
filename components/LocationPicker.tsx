@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap, Marker as MlMarker } from "maplibre-gl";
 import { MUNICIPALITY, withinBounds } from "@/lib/config";
 import { createMap } from "@/lib/map";
+import Alert from "./ui/Alert";
+import Icon from "./ui/Icon";
 
 export interface LngLat {
   lng: number;
@@ -96,9 +98,13 @@ export default function LocationPicker({ value, onChange }: { value: LngLat | nu
         onChangeRef.current(here);
         mapRef.current?.easeTo({ center: [here.lng, here.lat], zoom: 16 });
       },
-      () => {
+      (err) => {
         setLocating(false);
-        setGeoError("Could not get your location. Click the map to place the pin instead.");
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location access is blocked. Allow it in your browser settings, or click the map to place the pin."
+            : "Could not get your location. Click the map to place the pin instead.",
+        );
       },
       { enableHighAccuracy: true, timeout: 10_000 },
     );
@@ -108,19 +114,44 @@ export default function LocationPicker({ value, onChange }: { value: LngLat | nu
 
   return (
     <div>
-      <div ref={el} className="h-80 w-full overflow-hidden rounded-xl border border-slate-300" />
-      <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
-        <button type="button" onClick={useMyLocation} disabled={locating} className="btn btn-secondary !py-1.5">
+      <div
+        ref={el}
+        role="region"
+        aria-label="Map for choosing the problem location. Click to drop a pin, or use the buttons below."
+        className="h-72 w-full overflow-hidden rounded-[10px] border border-slate-300 bg-[#e8ecef] sm:h-80"
+      />
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={useMyLocation} disabled={locating} className="btn btn-secondary btn-sm">
+          <Icon name="locate" className="h-4 w-4" />
           {locating ? "Locating…" : "Use my location"}
         </button>
-        <span className="text-slate-600">
-          {value ? `Pin at ${value.lat.toFixed(5)}, ${value.lng.toFixed(5)} — drag to adjust` : "Click the map to drop a pin on the problem"}
-        </span>
+        {/* Keyboard and screen-reader users cannot click the map: pan it with the arrow keys, then pin the centre. */}
+        <button
+          type="button"
+          disabled={!ready}
+          onClick={() => {
+            const c = mapRef.current?.getCenter();
+            if (c) onChangeRef.current({ lng: c.lng, lat: c.lat });
+          }}
+          className="btn btn-secondary btn-sm"
+        >
+          <Icon name="pin" className="h-4 w-4" />
+          Pin map centre
+        </button>
       </div>
+      <p className="mt-2 text-sm text-slate-600" aria-live="polite">
+        {value ? (
+          <>
+            <span className="font-semibold text-slate-800">Pin placed</span> at <span className="font-mono">{value.lat.toFixed(5)}, {value.lng.toFixed(5)}</span>. Drag it to adjust.
+          </>
+        ) : (
+          "No pin yet: click the map where the problem is."
+        )}
+      </p>
       {(geoError || outside) && (
-        <p role="alert" className="mt-2 text-sm text-red-700">
-          {outside ? `That spot is outside ${MUNICIPALITY.name}. Move the pin inside the city.` : geoError}
-        </p>
+        <Alert tone="danger" className="mt-2">
+          {outside ? `That spot is outside ${MUNICIPALITY.name}. Move the pin inside the municipality.` : geoError}
+        </Alert>
       )}
     </div>
   );

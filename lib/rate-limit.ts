@@ -2,10 +2,11 @@ import { redis } from "./redis";
 import { HttpError } from "./errors";
 
 export function clientIp(req: Request): string {
-  // Behind a trusted reverse proxy, the first hop is the client.
+  // X-Real-IP is set by the edge (Vercel, a typical nginx) and overwrites anything the client sent.
+  // Otherwise use the last X-Forwarded-For hop, the one our own proxy appended: the first hop is whatever the client claims.
   return (
-    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    req.headers.get("x-real-ip") ||
+    req.headers.get("x-real-ip")?.trim() ||
+    req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ||
     "unknown"
   );
 }

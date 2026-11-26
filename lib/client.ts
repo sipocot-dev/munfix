@@ -6,7 +6,23 @@ export function apiError(data: unknown, fallback = "Something went wrong. Please
   return d.error ?? fallback;
 }
 
-/** Only allow same-site relative redirects after login. */
+/**
+ * Only allow same-site relative redirects after login. Parsed the way a browser would, because
+ * "/\evil.com" and "/<tab>/evil.com" pass a plain prefix check but resolve to another host.
+ */
 export function safeNext(value: string | null | undefined): string {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+  if (!value || !value.startsWith("/")) return "/";
+  const base = "http://munfix.invalid";
+  try {
+    const url = new URL(value, base);
+    return url.origin === base ? url.pathname + url.search + url.hash : "/";
+  } catch {
+    return "/";
+  }
+}
+
+/** A report id from a bare UUID or a pasted report URL (…/reports/<uuid>), for the "mark duplicate" form. */
+export function extractId(value: string): string {
+  const m = value.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return m ? m[0].toLowerCase() : value.trim();
 }

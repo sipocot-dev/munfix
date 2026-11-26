@@ -1,24 +1,28 @@
 import type { Metadata } from "next";
-import AdminNav from "@/components/AdminNav";
+import Alert from "@/components/ui/Alert";
+import PageHeader from "@/components/ui/PageHeader";
+import StatCard from "@/components/ui/StatCard";
 import { requirePageRole } from "@/lib/guards";
-import { getOverview } from "@/lib/overview";
+import { getOverview, type Overview } from "@/lib/overview";
 import { STATUS_COLOR, STATUS_LABEL } from "@/lib/status";
 
 export const metadata: Metadata = { title: "Overview" };
 
-function Bars({ rows }: { rows: { label: string; count: number; color?: string }[] }) {
+const dayLabel = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "UTC" });
+
+function Bars({ rows, empty }: { rows: { label: string; count: number; color?: string }[]; empty: string }) {
+  if (rows.length === 0) return <p className="text-sm text-slate-600">{empty}</p>;
   const max = Math.max(1, ...rows.map((r) => r.count));
-  if (rows.length === 0) return <p className="text-sm text-slate-500">No data yet.</p>;
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {rows.map((r) => (
         <li key={r.label} className="text-sm">
-          <div className="flex justify-between">
-            <span>{r.label}</span>
-            <span className="font-semibold tabular-nums">{r.count}</span>
+          <div className="flex justify-between gap-3">
+            <span className="truncate text-slate-700">{r.label}</span>
+            <span className="font-semibold tabular-nums text-slate-900">{r.count}</span>
           </div>
-          <div className="mt-1 h-2 rounded-full bg-slate-100">
-            <div className="h-2 rounded-full" style={{ width: `${(r.count / max) * 100}%`, background: r.color ?? "#1d3557" }} />
+          <div className="mt-1.5 h-2 rounded-full bg-slate-100" aria-hidden>
+            <div className="h-2 rounded-full" style={{ width: `${(r.count / max) * 100}%`, background: r.color ?? "#2c4a6e" }} />
           </div>
         </li>
       ))}
@@ -27,45 +31,106 @@ function Bars({ rows }: { rows: { label: string; count: number; color?: string }
 }
 
 export default async function OverviewPage() {
-  const session = await requirePageRole("/admin/overview", "moderator", "admin");
-  const o = await getOverview();
-  const maxDay = Math.max(1, ...o.daily.map((d) => d.count));
+  await requirePageRole("/admin/overview", "moderator", "admin");
+  // A failed query shows "not available", never a dashboard of zeros.
+  const o: Overview | null = await getOverview().catch((err) => {
+    console.error("[overview] could not load:", err instanceof Error ? err.message : err);
+    return null;
+  });
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <h1 className="text-3xl font-bold tracking-tight">Overview</h1>
-      <p className="mt-2 mb-4 text-slate-600">How reports are moving through the municipality.</p>
-      <AdminNav role={session.role} current="/admin/overview" />
+    <>
+      <PageHeader title="Overview" description="How reports are moving through the municipality. Counts include every status, published or not." />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="card p-5"><p className="text-sm text-slate-500">Total reports</p><p className="text-3xl font-bold">{o.total}</p></div>
-        <div className="card p-5"><p className="text-sm text-slate-500">Waiting for review</p><p className="text-3xl font-bold">{o.openQueue}</p></div>
-        <div className="card p-5"><p className="text-sm text-slate-500">Avg. days to resolve</p><p className="text-3xl font-bold">{o.avgResolutionDays === null ? "—" : o.avgResolutionDays.toFixed(1)}</p></div>
+      {!o && (
+        <Alert tone="warning" className="mb-6" title="The figures could not be loaded">
+          Refresh the page in a moment. If it keeps happening, check System.
+        </Alert>
+      )}
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <StatCard label="Total reports" value={o?.total ?? null} icon="inbox" />
+        <StatCard label="Waiting for review" value={o?.openQueue ?? null} icon="clock" accent="#6d28d9" hint="Submitted or under review" />
+        <StatCard
+          label="Average days to resolve"
+          value={o ? (o.avgResolutionDays === null ? "—" : o.avgResolutionDays.toFixed(1)) : null}
+          hint={o && o.avgResolutionDays === null ? "No resolved reports yet" : "From submission to resolved"}
+          icon="check"
+          accent="#15803d"
+        />
       </div>
 
-      <section className="card mt-6 p-5">
-        <h2 className="text-lg font-semibold">Reports per day (last 30 days)</h2>
-        <div className="mt-4 flex h-32 items-end gap-1" role="img" aria-label="Bar chart of reports submitted per day over the last 30 days">
-          {o.daily.map((d) => (
-            <div key={d.day} title={`${d.day}: ${d.count}`} className="flex-1 rounded-t bg-ink-600" style={{ height: `${Math.max(d.count ? 6 : 2, (d.count / maxDay) * 100)}%`, opacity: d.count ? 1 : 0.2 }} />
-          ))}
-        </div>
-      </section>
+      {o && (
+        <>
+          <section className="card mt-6 p-5 sm:p-6" aria-labelledby="daily-title">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 id="daily-title" className="text-lg font-semibold">
+                New reports per day
+              </h2>
+              <p className="text-sm text-slate-600">
+                Last 30 days · {o.daily.reduce((n, d) => n + d.count, 0)} in total
+              </p>
+            </div>
+            <DailyChart daily={o.daily} />
+          </section>
 
-      <div className="mt-6 grid gap-6 md:grid-cols-3">
-        <section className="card p-5">
-          <h2 className="mb-3 text-lg font-semibold">By status</h2>
-          <Bars rows={o.byStatus.map((s) => ({ label: STATUS_LABEL[s.status], count: s.count, color: STATUS_COLOR[s.status] }))} />
-        </section>
-        <section className="card p-5">
-          <h2 className="mb-3 text-lg font-semibold">By category</h2>
-          <Bars rows={o.byCategory.map((c) => ({ label: c.name, count: c.count }))} />
-        </section>
-        <section className="card p-5">
-          <h2 className="mb-3 text-lg font-semibold">Top barangays</h2>
-          <Bars rows={o.topBarangays.map((b) => ({ label: b.barangay, count: b.count }))} />
-        </section>
+          <div className="mt-6 grid gap-6 lg:grid-cols-3">
+            <section className="card p-5 sm:p-6">
+              <h2 className="mb-4 text-lg font-semibold">By status</h2>
+              <Bars rows={o.byStatus.map((s) => ({ label: STATUS_LABEL[s.status], count: s.count, color: STATUS_COLOR[s.status] }))} empty="No reports yet." />
+            </section>
+            <section className="card p-5 sm:p-6">
+              <h2 className="mb-4 text-lg font-semibold">By category</h2>
+              <Bars rows={o.byCategory.map((c) => ({ label: c.name, count: c.count }))} empty="No reports yet." />
+            </section>
+            <section className="card p-5 sm:p-6">
+              <h2 className="mb-4 text-lg font-semibold">Top barangays</h2>
+              <Bars rows={o.topBarangays.map((b) => ({ label: b.barangay, count: b.count }))} empty="No report has a barangay yet." />
+            </section>
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
+function DailyChart({ daily }: { daily: Overview["daily"] }) {
+  const max = Math.max(1, ...daily.map((d) => d.count));
+  const label = (day: string) => dayLabel.format(new Date(`${day}T00:00:00Z`));
+  return (
+    <>
+      <div className="mt-5 flex h-40 items-end gap-[3px] border-b border-slate-200" aria-hidden>
+        {daily.map((d) => (
+          <div key={d.day} title={`${label(d.day)}: ${d.count}`} className="group relative flex h-full flex-1 items-end">
+            <div className={`w-full rounded-t-sm ${d.count ? "bg-ink-600 group-hover:bg-ink-800" : "bg-slate-200"}`} style={{ height: d.count ? `${Math.max(6, (d.count / max) * 100)}%` : "3px" }} />
+          </div>
+        ))}
       </div>
-    </div>
+      <div className="mt-1.5 flex justify-between text-xs text-slate-600" aria-hidden>
+        <span>{daily[0] && label(daily[0].day)}</span>
+        <span>Peak: {max === 1 && daily.every((d) => d.count === 0) ? 0 : max} per day</span>
+        <span>{daily.at(-1) && label(daily.at(-1)!.day)}</span>
+      </div>
+      {/* The same numbers as a table, for screen readers and anyone who wants exact values. */}
+      <details className="mt-3 text-sm">
+        <summary className="cursor-pointer font-semibold text-ink-700">Show as a table</summary>
+        <table className="mt-2 w-full max-w-sm text-left">
+          <thead className="text-xs uppercase tracking-wide text-slate-600">
+            <tr>
+              <th className="py-1">Day</th>
+              <th className="py-1 text-right">Reports</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {daily.map((d) => (
+              <tr key={d.day}>
+                <td className="py-1">{label(d.day)}</td>
+                <td className="py-1 text-right tabular-nums">{d.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </details>
+    </>
   );
 }

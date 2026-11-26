@@ -3,13 +3,17 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DeleteAccount, PasswordForm, ProfileForm } from "@/components/AccountForms";
 import NotificationToggle from "@/components/NotificationToggle";
+import Alert from "@/components/ui/Alert";
+import PageHeader from "@/components/ui/PageHeader";
 import { getAccount } from "@/lib/accounts";
 import { formatDate } from "@/lib/format";
 import { mailEnabled } from "@/lib/mail";
 import { isStaffRole, ROLE_DESCRIPTION, ROLE_LABEL } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
 
-export const metadata: Metadata = { title: "My account" };
+export const metadata: Metadata = { title: "Account settings" };
+
+const PROVIDER_LABEL: Record<string, string> = { google: "Google", facebook: "Facebook" };
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
   const session = await getSession();
@@ -17,60 +21,60 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
   const account = await getAccount(session.userId);
   if (!account) redirect("/login");
   const forced = session.mustChangePassword === true;
+  const providers = account.providers.map((p) => PROVIDER_LABEL[p] ?? p);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-8">
-      <h1 className="text-3xl font-bold tracking-tight">{forced ? "Choose a new password" : "My account"}</h1>
+    <div className="container-page container-narrow">
+      <PageHeader title={forced ? "Choose a new password" : "Account settings"} description={forced ? undefined : `${account.email} · member since ${formatDate(account.createdAt)}`} />
 
-      {forced && (
-        <p role="alert" className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Your account uses a temporary password. Set a new one to continue — until then the rest of the site is locked for this account.
-        </p>
-      )}
-      {!forced && (await searchParams).reason === "password" && (
-        <p className="rounded-lg bg-ink-50 px-4 py-3 text-sm text-ink-900">Your password is up to date.</p>
-      )}
-
-      <section className="card space-y-3 p-5">
-        <h2 className="text-lg font-semibold">{forced ? "New password" : "Password"}</h2>
-        <PasswordForm hasPassword={account.hasPassword} forced={forced} />
-        {!account.hasPassword && (
-          <p className="text-xs text-slate-500">You signed up with {account.providers.join(" / ") || "a provider"}. Setting a password lets you also log in with email.</p>
+      <div className="space-y-6">
+        {forced && (
+          <Alert tone="warning" live={false} title="Your account uses a temporary password">
+            Choose your own password to continue. Until then the rest of MunFix is locked for this account.
+          </Alert>
         )}
-      </section>
+        {!forced && (await searchParams).reason === "password" && <Alert tone="success" title="Your password is up to date." />}
 
-      {!forced && (
-        <>
-          <section className="card space-y-3 p-5">
-            <h2 className="text-lg font-semibold">Profile</h2>
-            <p className="text-sm text-slate-600">
-              {account.email} · member since {formatDate(account.createdAt)}
-            </p>
-            <p className="text-sm">
-              <span className="rounded-full bg-ink-50 px-2 py-0.5 text-xs font-semibold text-ink-800">{ROLE_LABEL[account.role]}</span>{" "}
+        {!forced && (
+          <Panel title="Profile">
+            <div className="mb-5 flex flex-wrap items-center gap-2 text-sm">
+              <span className="rounded-full bg-ink-50 px-2.5 py-0.5 text-xs font-semibold text-ink-800">{ROLE_LABEL[account.role]}</span>
               <span className="text-slate-600">{ROLE_DESCRIPTION[account.role]}</span>
-            </p>
+            </div>
             <ProfileForm name={account.name} />
-            {account.providers.length > 0 && (
-              <p className="text-sm text-slate-600">Connected sign-in: {account.providers.map((p) => (p === "google" ? "Google" : "Facebook")).join(", ")}</p>
-            )}
-          </section>
+            {providers.length > 0 && <p className="mt-4 text-sm text-slate-600">Connected sign-in: {providers.join(", ")}</p>}
+          </Panel>
+        )}
 
-          {mailEnabled() && <NotificationToggle initial={account.emailNotifications} />}
+        <Panel title={forced ? "New password" : "Password"} description={!account.hasPassword ? `You signed up with ${providers.join(" / ") || "a sign-in provider"}. Setting a password lets you also log in with your email.` : undefined}>
+          <PasswordForm hasPassword={account.hasPassword} forced={forced} />
+        </Panel>
 
-          <section className="card space-y-3 p-5">
-            <h2 className="text-lg font-semibold">Delete account</h2>
+        {!forced && mailEnabled() && <NotificationToggle initial={account.emailNotifications} />}
+
+        {!forced && (
+          <Panel title="Delete account" danger>
             {isStaffRole(account.role) ? (
               <p className="text-sm text-slate-600">Staff and administrator accounts cannot be deleted here. Ask an administrator to change your role first.</p>
             ) : (
               <DeleteAccount />
             )}
-            <p className="text-xs text-slate-500">
-              See our <Link href="/privacy" className="underline">privacy policy</Link> and <Link href="/data-deletion" className="underline">data deletion instructions</Link>.
+            <p className="mt-4 text-sm text-slate-600">
+              See the <Link href="/privacy" className="link">privacy policy</Link> and the <Link href="/data-deletion" className="link">data deletion instructions</Link>.
             </p>
-          </section>
-        </>
-      )}
+          </Panel>
+        )}
+      </div>
     </div>
+  );
+}
+
+function Panel({ title, description, danger, children }: { title: string; description?: string; danger?: boolean; children: React.ReactNode }) {
+  return (
+    <section className={`card p-5 sm:p-6 ${danger ? "border-red-200" : ""}`} aria-label={title}>
+      <h2 className={`text-lg font-semibold ${danger ? "text-red-800" : "text-slate-900"}`}>{title}</h2>
+      {description && <p className="mt-1 text-sm text-slate-600">{description}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
   );
 }

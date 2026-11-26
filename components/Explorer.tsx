@@ -1,46 +1,57 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
-import type { Category, ReportSummary } from "@/lib/reports";
-import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL, type Status } from "@/lib/status";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { Category, ReportSummary, Stats } from "@/lib/reports";
+import { MUNICIPALITY } from "@/lib/config";
+import { DEFAULT_STATUSES, filtersToQuery, matchesQuery, type ExplorerFilters } from "@/lib/explorer";
 import { formatDate } from "@/lib/format";
+import { PUBLIC_STATUSES, STATUS_COLOR, STATUS_LABEL, type Status } from "@/lib/status";
 import ReportsMap from "./ReportsMap";
 import StatusBadge from "./StatusBadge";
+import Icon, { CategoryIcon } from "./ui/Icon";
+import { Skeleton } from "./ui/Skeleton";
 
-/** The map opens on reports that still need work; citizens can switch on Resolved. */
-const DEFAULT_STATUSES: Status[] = ["verified", "in_progress"];
-
-interface Stats {
-  verified: number;
-  inProgress: number;
-  resolved: number;
-  avgResolutionDays: number | null;
+function useDebounced<T>(value: T, ms: number): T {
+  const [v, setV] = useState(value);
+  useEffect(() => {
+    const t = setTimeout(() => setV(value), ms);
+    return () => clearTimeout(t);
+  }, [value, ms]);
+  return v;
 }
 
 export default function Explorer({
   initialReports,
   categories,
   stats,
+  initialFilters,
 }: {
   initialReports: ReportSummary[];
   categories: Category[];
-  stats: Stats;
+  /** null when the numbers could not be loaded. */
+  stats: Stats | null;
+  initialFilters: ExplorerFilters;
 }) {
-  const [reports, setReports] = useState(initialReports.filter((r) => DEFAULT_STATUSES.includes(r.status)));
-  const [statuses, setStatuses] = useState<Status[]>([...DEFAULT_STATUSES]);
-  const [category, setCategory] = useState("");
+  const [statuses, setStatuses] = useState<Status[]>(initialFilters.statuses);
+  const [category, setCategory] = useState(initialFilters.category);
+  const [query, setQuery] = useState(initialFilters.q);
+  const needle = useDebounced(query.trim(), 200);
+  const [reports, setReports] = useState(() =>
+    initialReports.filter((r) => initialFilters.statuses.includes(r.status) && (!initialFilters.category || r.categorySlug === initialFilters.category)),
+  );
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [inView, setInView] = useState<Set<string> | null>(null);
+  const [onlyInView, setOnlyInView] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
-  const [panel, setPanel] = useState<"filters" | "list" | null>(null);
-  const [query, setQuery] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [mobileView, setMobileView] = useState<"map" | "list">("map");
   const first = useRef(true);
   const requestId = useRef(0);
 
+  // Refetch from the server when status or category change (the server caps a list at 500).
   useEffect(() => {
-    // The server already rendered the unfiltered list.
     if (first.current) {
       first.current = false;
       return;
@@ -49,11 +60,10 @@ export default function Explorer({
     setLoading(true);
     setError(false);
     const params = new URLSearchParams({ limit: "500" });
-    if (statuses.length > 0 && statuses.length < PUBLIC_STATUSES.length) params.set("status", statuses.join(","));
+    if (statuses.length < PUBLIC_STATUSES.length) params.set("status", statuses.join(","));
     if (category) params.set("category", category);
-
     fetch(`/api/v1/reports?${params}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad response"))))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((data: { reports: ReportSummary[] }) => {
         if (id === requestId.current) setReports(data.reports);
       })
@@ -65,174 +75,237 @@ export default function Explorer({
       });
   }, [statuses, category]);
 
+  // Keep the address bar in step with the filters, without adding history entries.
+  useEffect(() => {
+    const url = `${window.location.pathname}${filtersToQuery({ statuses, category, q: needle })}`;
+    window.history.replaceState(window.history.state, "", url);
+  }, [statuses, category, needle]);
+
+  const matching = useMemo(() => reports.filter((r) => matchesQuery(r, needle)), [reports, needle]);
+  const listed = onlyInView && inView ? matching.filter((r) => inView.has(r.id)) : matching;
+  const filtered = statuses.join() !== DEFAULT_STATUSES.join() || category !== "" || needle !== "";
+
   function toggle(status: Status) {
     setStatuses((prev) => {
       const next = prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status];
-      // Never end up with nothing selected.
-      return next.length === 0 ? [...PUBLIC_STATUSES] : next;
+      // Never end up with nothing selected; keep the canonical order so URLs are stable.
+      return next.length === 0 ? [...PUBLIC_STATUSES] : PUBLIC_STATUSES.filter((s) => next.includes(s));
     });
   }
 
-  const needle = query.trim().toLowerCase();
-  const matches = needle
-    ? reports
-        .filter((r) =>
-          [r.title, r.categoryName, r.problemType, r.barangay, r.address].some((v) => v?.toLowerCase().includes(needle)),
-        )
-        .slice(0, 8)
-    : [];
-
-  function pick(id: string) {
-    setSelectedId(id);
+  function reset() {
+    setStatuses([...DEFAULT_STATUSES]);
+    setCategory("");
     setQuery("");
-    setSearchOpen(false);
   }
 
-  const filtered = statuses.join() !== DEFAULT_STATUSES.join() || category !== "";
-  const btn = "inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 panel hover:bg-slate-50";
+  function showOnMap(id: string) {
+    setSelectedId(id);
+    setMobileView("map");
+  }
 
-  // Stats on the map (desktop) and in the list panel (phones): one definition, two places.
-  const statCells = (floating: boolean) => (
-    <dl className={floating ? "hidden grid-cols-4 gap-3 rounded-xl bg-white p-3 text-center shadow-lg ring-1 ring-black/5 sm:grid" : "grid grid-cols-4 gap-2 border-b border-slate-100 p-3 text-center"}>
-      {[
-        ["Verified", stats.verified, "#d97706"],
-        ["In progress", stats.inProgress, "#2563eb"],
-        ["Resolved", stats.resolved, "#16a34a"],
-        ["Avg. fix", stats.avgResolutionDays === null ? "—" : `${stats.avgResolutionDays}d`, "#1d3557"],
-      ].map(([label, value, color]) => (
-        <div key={label as string}>
-          <dd className="text-lg font-bold" style={{ color: color as string }}>{value}</dd>
-          <dt className="text-[11px] text-slate-500">{label}</dt>
-        </div>
-      ))}
-    </dl>
+  const searchBox = (
+    <div className="relative">
+      <Icon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+      <input
+        type="search"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder="Search problems, places, barangays"
+        aria-label="Search reports"
+        className="field !pl-10 !pr-10"
+      />
+      {query && (
+        <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-md text-slate-500 hover:bg-slate-100">
+          <Icon name="x" className="h-4 w-4" />
+        </button>
+      )}
+    </div>
   );
 
   return (
-    <section aria-label="Reports map" className="relative h-[calc(100svh-4rem)] min-h-[480px]">
-      <div className="absolute right-3 top-3 z-10">{statCells(true)}</div>
-      <ReportsMap
-        reports={reports}
-        categories={categories}
-        selectedId={selectedId}
-        onSelect={setSelectedId}
-        className="h-full w-full"
-      />
-
-      <div className="absolute left-3 top-3 flex w-[calc(100%-1.5rem)] max-w-sm flex-col gap-2 sm:w-96">
-        <div className="relative">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSearchOpen(true);
-            }}
-            onFocus={() => setSearchOpen(true)}
-            onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
-            placeholder="Search problems, places, barangays…"
-            aria-label="Search reports"
-            className="w-full rounded-xl bg-white px-4 py-2.5 text-sm panel placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-ink-600"
-          />
-          {searchOpen && needle && (
-            <ul className="absolute left-0 right-0 top-full z-10 mt-1 max-h-72 overflow-y-auto rounded-xl bg-white py-1 text-sm shadow-lg ring-1 ring-black/5">
-              {matches.length === 0 && <li className="px-4 py-2 text-slate-500">No matching reports on the map.</li>}
-              {matches.map((r) => (
-                <li key={r.id}>
-                  <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => pick(r.id)} className="block w-full px-4 py-2 text-left hover:bg-slate-50">
-                    <span className="block truncate font-medium">{r.title}</span>
-                    <span className="block truncate text-xs text-slate-500">{[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <button type="button" className={btn} aria-expanded={panel === "filters"} onClick={() => setPanel(panel === "filters" ? null : "filters")}>
-            Filters{filtered && <span className="h-2 w-2 rounded-full bg-orange-500" aria-label="active" />}
-          </button>
-          <button type="button" className={btn} aria-expanded={panel === "list"} onClick={() => setPanel(panel === "list" ? null : "list")}>
-            List
-          </button>
-          {loading && <span className="self-center rounded-full bg-white/90 px-2 py-1 text-xs text-slate-500 shadow">Updating…</span>}
-        </div>
-
-        {panel === "filters" && (
-          <div className="rounded-xl bg-white p-4 shadow-lg ring-1 ring-black/5">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+    <section aria-label="Reports map and list" className="relative grid h-[calc(100svh-4rem)] min-h-[520px] lg:grid-cols-[420px_minmax(0,1fr)]">
+      {/* Sidebar: the accessible, keyboard-first view of everything on the map. */}
+      <div className={`${mobileView === "list" ? "flex" : "hidden"} min-h-0 flex-col border-r border-slate-200 bg-white lg:flex`}>
+        <div className="space-y-4 border-b border-slate-200 p-4 sm:p-5">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">Reported issues in {MUNICIPALITY.name}</h1>
+            <p className="mt-1 text-sm text-slate-600">Verified reports from residents, and how far along each one is.</p>
+          </div>
+          <StatsRow stats={stats} />
+          {searchBox}
+          <fieldset>
+            <legend className="eyebrow mb-2">Status</legend>
             <div className="flex flex-wrap gap-2">
-              {PUBLIC_STATUSES.map((s) => {
-                const on = statuses.includes(s);
-                return (
-                  <button
-                    key={s}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => toggle(s)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                      on ? "border-slate-300 bg-white text-slate-900 shadow-sm" : "border-transparent bg-slate-200/60 text-slate-500"
-                    }`}
-                  >
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: on ? STATUS_COLOR[s] : "#94a3b8" }} />
-                    {STATUS_LABEL[s]}
-                  </button>
-                );
-              })}
+              {PUBLIC_STATUSES.map((s) => (
+                <button key={s} type="button" aria-pressed={statuses.includes(s)} onClick={() => toggle(s)} className="chip">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: statuses.includes(s) ? STATUS_COLOR[s] : "#94a3b8" }} aria-hidden />
+                  {STATUS_LABEL[s]}
+                </button>
+              ))}
             </div>
-            <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+          </fieldset>
+          <div>
+            <label htmlFor="explorer-category" className="eyebrow mb-2 block">
               Category
-              <select value={category} onChange={(e) => setCategory(e.target.value)} className="field mt-1 text-sm font-normal normal-case tracking-normal text-slate-900">
-                <option value="">All categories</option>
-                {categories.map((c) => (
-                  <option key={c.slug} value={c.slug}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
             </label>
+            <select id="explorer-category" value={category} onChange={(e) => setCategory(e.target.value)} className="field">
+              <option value="">All categories</option>
+              {categories.map((c) => (
+                <option key={c.slug} value={c.slug}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5 text-sm sm:px-5">
+          <p aria-live="polite" className="font-medium text-slate-700">
+            {loading ? "Updating…" : `${listed.length} report${listed.length === 1 ? "" : "s"}`}
+            {filtered && !loading && (
+              <button type="button" onClick={reset} className="ml-2 font-semibold text-ink-700 underline underline-offset-2">
+                Clear filters
+              </button>
+            )}
+          </p>
+          <label className="inline-flex cursor-pointer items-center gap-2 text-slate-600">
+            <input type="checkbox" checked={onlyInView} onChange={(e) => setOnlyInView(e.target.checked)} className="h-4 w-4 accent-ink-700" />
+            Only in map view
+          </label>
+        </div>
+
+        {error && (
+          <p role="alert" className="mx-4 mt-3 flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+            <Icon name="alert" className="mt-0.5 h-4 w-4 flex-none" />
+            Could not refresh the reports. Showing the last results.
+          </p>
         )}
 
-        {panel === "list" && (
-          <div className="flex max-h-[calc(100svh-11rem)] flex-col rounded-xl bg-white shadow-lg ring-1 ring-black/5">
-            {statCells(false)}
-            {error && <p role="alert" className="m-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">Could not refresh the map. Showing the last results.</p>}
-            <ul className="space-y-2 overflow-y-auto p-3">
-              {reports.length === 0 && !loading && <li className="p-6 text-center text-sm text-slate-500">No reports match these filters yet.</li>}
-              {reports.map((r) => (
-                <li key={r.id} className={`flex gap-3 rounded-lg border p-2 ${selectedId === r.id ? "border-ink-600 ring-1 ring-ink-600" : "border-slate-200"}`}>
-                  {r.thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.thumb} alt="" loading="lazy" className="h-14 w-14 flex-none rounded-md object-cover" />
-                  ) : (
-                    <div className="grid h-14 w-14 flex-none place-items-center rounded-md bg-slate-100 text-slate-400" aria-hidden>
-                      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.5">
-                        <path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11Z" />
-                        <circle cx="12" cy="10" r="2.5" />
-                      </svg>
-                    </div>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <Link href={`/reports/${r.id}`} className="line-clamp-2 text-sm font-semibold leading-snug hover:text-ink-700">
-                        {r.title}
-                      </Link>
-                      <StatusBadge status={r.status} />
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-slate-500">
-                      {[r.categoryName, r.problemType, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
-                    </p>
-                    <button type="button" onClick={() => setSelectedId(r.id)} className="text-xs font-semibold text-ink-700 hover:underline">
-                      Show on map
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 sm:p-4" aria-busy={loading}>
+          {loading && listed.length === 0 &&
+            Array.from({ length: 4 }, (_, i) => (
+              <li key={i} className="flex gap-3 rounded-lg border border-slate-200 p-3">
+                <Skeleton className="h-16 w-16 flex-none" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-4/5" />
+                  <Skeleton className="h-3 w-1/2" />
+                </div>
+              </li>
+            ))}
+          {!loading && listed.length === 0 && (
+            <li className="px-4 py-10 text-center">
+              <Icon name="search" className="mx-auto h-7 w-7 text-slate-400" />
+              <p className="mt-2 font-semibold text-slate-800">{reports.length === 0 && !filtered ? "No public reports yet" : "No reports match"}</p>
+              <p className="mt-1 text-sm text-slate-600">
+                {reports.length === 0 && !filtered ? "Verified reports appear here and on the map." : onlyInView ? "Move the map, or turn off “Only in map view”." : "Try another word or clear the filters."}
+              </p>
+            </li>
+          )}
+          {listed.map((r) => (
+            <li
+              key={r.id}
+              onMouseEnter={() => setHoverId(r.id)}
+              onMouseLeave={() => setHoverId(null)}
+              className={`group flex gap-3 rounded-lg border p-3 transition-colors ${selectedId === r.id ? "border-ink-600 bg-ink-50/50 ring-1 ring-ink-600" : "border-slate-200 hover:border-slate-300"}`}
+            >
+              {r.thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.thumb} alt="" loading="lazy" decoding="async" className="h-16 w-16 flex-none rounded-md bg-slate-100 object-cover" />
+              ) : (
+                <div className="grid h-16 w-16 flex-none place-items-center rounded-md bg-slate-100 text-slate-500" aria-hidden>
+                  <CategoryIcon slug={r.categorySlug} className="h-6 w-6" />
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <Link href={`/reports/${r.id}`} className="line-clamp-2 text-sm font-semibold leading-snug text-slate-900 hover:text-ink-700 hover:underline">
+                    {r.title}
+                  </Link>
+                  <StatusBadge status={r.status} />
+                </div>
+                <p className="mt-1 truncate text-xs text-slate-600">
+                  {[r.categoryName, r.barangay].filter(Boolean).join(" · ")} · {formatDate(r.createdAt)}
+                </p>
+                <button type="button" onClick={() => showOnMap(r.id)} className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-ink-700 hover:underline">
+                  <Icon name="pin" className="h-3.5 w-3.5" />
+                  Show on map
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <p className="border-t border-slate-100 px-4 py-3 text-xs text-slate-500 sm:px-5">
+          <Link href="/about" className="hover:underline">How it works</Link> · <Link href="/privacy" className="hover:underline">Privacy</Link> ·{" "}
+          <Link href="/terms" className="hover:underline">Terms</Link> · Not for emergencies
+        </p>
+      </div>
+
+      <div className={`${mobileView === "map" ? "block" : "hidden"} relative min-h-0 lg:block`}>
+        <ReportsMap
+          reports={matching}
+          categories={categories}
+          selectedId={selectedId}
+          highlightId={hoverId}
+          onSelect={setSelectedId}
+          onViewChange={setInView}
+          className="h-full w-full"
+        />
+        {/* Phones: search stays on the map; filters live in the list view. */}
+        <div className="absolute inset-x-3 top-3 flex gap-2 lg:hidden">
+          <div className="panel min-w-0 flex-1">{searchBox}</div>
+          <button
+            type="button"
+            onClick={() => setMobileView("list")}
+            className="panel relative grid h-11 w-11 flex-none place-items-center text-slate-700"
+            aria-label={filtered ? "Filters (active)" : "Filters"}
+          >
+            <Icon name="filter" />
+            {filtered && <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-signal-600" aria-hidden />}
+          </button>
+        </div>
+      </div>
+
+      {/* Phones: switch between the map and the list. */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-10 flex justify-center lg:hidden">
+        <div role="group" aria-label="View" className="pointer-events-auto flex rounded-full bg-slate-900 p-1 text-sm font-semibold text-white shadow-[var(--shadow-raised)]">
+          {(["map", "list"] as const).map((v) => (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={mobileView === v}
+              onClick={() => setMobileView(v)}
+              className={`inline-flex h-10 items-center gap-2 rounded-full px-4 ${mobileView === v ? "bg-white text-slate-900" : "text-slate-200"}`}
+            >
+              <Icon name={v} className="h-4 w-4" />
+              {v === "map" ? "Map" : `List (${listed.length})`}
+            </button>
+          ))}
+        </div>
       </div>
     </section>
+  );
+}
+
+function StatsRow({ stats }: { stats: Stats | null }) {
+  const cells: [string, number | string | null][] = [
+    ["Verified", stats?.verified ?? null],
+    ["In progress", stats?.inProgress ?? null],
+    ["Resolved", stats?.resolved ?? null],
+    ["Avg. days to fix", stats ? stats.avgResolutionDays : null],
+  ];
+  return (
+    <div>
+      <dl className="grid grid-cols-4 divide-x divide-slate-200 rounded-lg border border-slate-200">
+        {cells.map(([label, value]) => (
+          <div key={label} className="flex flex-col-reverse px-2 py-2 text-center">
+            <dt className="text-[11px] leading-tight text-slate-600">{label}</dt>
+            <dd className="text-lg font-bold tabular-nums text-slate-900">{value ?? "—"}</dd>
+          </div>
+        ))}
+      </dl>
+      {!stats && <p className="mt-1.5 text-xs text-slate-500">Figures are not available right now.</p>}
+    </div>
   );
 }

@@ -3,49 +3,50 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiError } from "@/lib/client";
+import Alert from "./ui/Alert";
+import { useToast } from "./ui/Feedback";
+import FormField from "./ui/FormField";
+import PasswordInput from "./ui/PasswordInput";
+import Spinner from "./ui/Spinner";
 
-function Msg({ ok, text }: { ok: boolean; text: string | null }) {
-  if (!text) return null;
-  return (
-    <p role={ok ? "status" : "alert"} className={`rounded-lg px-3 py-2 text-sm ${ok ? "bg-ink-50 text-ink-900" : "bg-red-50 text-red-700"}`}>
-      {text}
-    </p>
-  );
-}
+const OFFLINE = "Could not reach the server. Check your connection and try again.";
 
 export function ProfileForm({ name }: { name: string }) {
   const router = useRouter();
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const toast = useToast();
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const value = String(new FormData(e.currentTarget).get("name") ?? "").trim();
+    if (value === name) return;
     setBusy(true);
-    setMsg(null);
+    setError(null);
     try {
       const res = await fetch("/api/v1/me/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: new FormData(e.currentTarget).get("name") }),
+        body: JSON.stringify({ name: value }),
       });
-      const data = await res.json().catch(() => ({}));
-      setMsg(res.ok ? { ok: true, text: "Name saved." } : { ok: false, text: apiError(data) });
-      if (res.ok) router.refresh();
+      if (!res.ok) return setError(apiError(await res.json().catch(() => ({}))));
+      toast("Your name was saved.");
+      router.refresh();
     } catch {
-      setMsg({ ok: false, text: "Could not reach the server." });
+      setError(OFFLINE);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <label className="block text-sm font-medium">
-        Display name
-        <input name="name" defaultValue={name} required minLength={2} maxLength={80} className="field mt-1" />
-      </label>
-      <Msg ok={msg?.ok ?? false} text={msg?.text ?? null} />
-      <button type="submit" disabled={busy} className="btn btn-secondary">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <FormField label="Display name" hint="Seen by city staff. Never shown on public reports.">
+        <input name="name" defaultValue={name} required minLength={2} maxLength={80} autoComplete="name" className="field sm:max-w-sm" />
+      </FormField>
+      {error && <Alert tone="danger">{error}</Alert>}
+      <button type="submit" disabled={busy} className="btn btn-secondary btn-sm">
+        {busy && <Spinner />}
         {busy ? "Saving…" : "Save name"}
       </button>
     </form>
@@ -54,54 +55,51 @@ export function ProfileForm({ name }: { name: string }) {
 
 export function PasswordForm({ hasPassword, forced }: { hasPassword: boolean; forced: boolean }) {
   const router = useRouter();
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const toast = useToast();
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const form = e.currentTarget;
     const f = new FormData(form);
-    if (f.get("newPassword") !== f.get("confirm")) return setMsg({ ok: false, text: "The two passwords do not match." });
+    if (f.get("newPassword") !== f.get("confirm")) return setError("The two new passwords do not match.");
     setBusy(true);
-    setMsg(null);
+    setError(null);
     try {
       const res = await fetch("/api/v1/me/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ currentPassword: f.get("currentPassword") || undefined, newPassword: f.get("newPassword") }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return setMsg({ ok: false, text: apiError(data) });
+      if (!res.ok) return setError(apiError(await res.json().catch(() => ({}))));
       form.reset();
-      setMsg({ ok: true, text: "Password changed. Other devices were signed out." });
+      toast("Password changed. Other devices were signed out.");
       router.push("/account");
       router.refresh();
     } catch {
-      setMsg({ ok: false, text: "Could not reach the server." });
+      setError(OFFLINE);
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
+    <form onSubmit={onSubmit} className="space-y-4 sm:max-w-sm">
       {hasPassword && (
-        <label className="block text-sm font-medium">
-          {forced ? "Temporary password" : "Current password"}
-          <input name="currentPassword" type="password" required autoComplete="current-password" className="field mt-1" />
-        </label>
+        <FormField label={forced ? "Temporary password" : "Current password"}>
+          <PasswordInput name="currentPassword" required autoComplete="current-password" />
+        </FormField>
       )}
-      <label className="block text-sm font-medium">
-        New password
-        <input name="newPassword" type="password" required minLength={8} autoComplete="new-password" className="field mt-1" />
-        <span className="mt-1 block text-xs font-normal text-slate-500">At least 8 characters; avoid common passwords.</span>
-      </label>
-      <label className="block text-sm font-medium">
-        Confirm new password
-        <input name="confirm" type="password" required minLength={8} autoComplete="new-password" className="field mt-1" />
-      </label>
-      <Msg ok={msg?.ok ?? false} text={msg?.text ?? null} />
+      <FormField label="New password" hint="At least 8 characters. Avoid common passwords.">
+        <PasswordInput name="newPassword" required minLength={8} maxLength={128} autoComplete="new-password" />
+      </FormField>
+      <FormField label="Confirm new password">
+        <PasswordInput name="confirm" required minLength={8} maxLength={128} autoComplete="new-password" />
+      </FormField>
+      {error && <Alert tone="danger">{error}</Alert>}
       <button type="submit" disabled={busy} className="btn btn-primary">
+        {busy && <Spinner />}
         {busy ? "Saving…" : hasPassword ? "Change password" : "Set password"}
       </button>
     </form>
@@ -128,7 +126,7 @@ export function DeleteAccount() {
       router.push("/");
       router.refresh();
     } catch {
-      setError("Could not reach the server.");
+      setError(OFFLINE);
     } finally {
       setBusy(false);
     }
@@ -136,26 +134,26 @@ export function DeleteAccount() {
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="btn btn-danger">
+      <button type="button" onClick={() => setOpen(true)} className="btn btn-danger btn-sm">
         Delete my account…
       </button>
     );
   }
   return (
-    <div className="space-y-3 rounded-lg bg-red-50 p-4">
-      <p className="text-sm text-red-900">
-        This removes your name and email and signs you out everywhere. Reports still awaiting review are withdrawn; published reports stay on the public map without your name. This cannot be undone.
+    <div className="space-y-4 rounded-lg border border-red-200 bg-red-50 p-4">
+      <p className="text-sm leading-relaxed text-red-900">
+        This removes your name and email and signs you out everywhere. Reports still awaiting review are withdrawn; published reports stay on the public map without your name. <strong>This cannot be undone.</strong>
       </p>
-      <label className="block text-sm font-medium text-red-900">
-        Type DELETE to confirm
-        <input value={text} onChange={(e) => setText(e.target.value)} className="field mt-1" autoComplete="off" />
-      </label>
-      <Msg ok={false} text={error} />
-      <div className="flex gap-2">
-        <button type="button" disabled={busy || text !== "DELETE"} onClick={remove} className="btn btn-danger">
-          {busy ? "Deleting…" : "Permanently delete"}
+      <FormField label="Type DELETE to confirm">
+        <input value={text} onChange={(e) => setText(e.target.value)} className="field sm:max-w-xs" autoComplete="off" autoCapitalize="characters" spellCheck={false} />
+      </FormField>
+      {error && <Alert tone="danger">{error}</Alert>}
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={busy || text !== "DELETE"} onClick={remove} className="btn btn-danger-solid btn-sm">
+          {busy && <Spinner />}
+          {busy ? "Deleting…" : "Permanently delete my account"}
         </button>
-        <button type="button" onClick={() => setOpen(false)} className="btn btn-secondary">
+        <button type="button" onClick={() => setOpen(false)} className="btn btn-secondary btn-sm">
           Cancel
         </button>
       </div>

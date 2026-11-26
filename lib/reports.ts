@@ -2,6 +2,7 @@ import type { PoolClient } from "pg";
 import { cached, invalidateReports, reportsVersion } from "./cache";
 import { isUuid, query, withTx } from "./db";
 import { HttpError } from "./errors";
+import { enforceRateLimit } from "./rate-limit";
 import { queueStatusEmail, triggerDrain } from "./notifications";
 import { allowedTransitions, canViewUnpublished, isStaffRole, viewableStatuses, type Role } from "./permissions";
 import type { Session } from "./session";
@@ -577,6 +578,8 @@ export async function transitionReport(
 /** Feedback or a follow-up request, kept in the report's log (report_events). Public reports only. */
 export async function addActivity(id: string, actor: Session, kind: "feedback" | "followup", text: string): Promise<void> {
   if (!isUuid(id)) throw new HttpError(404, "Report not found");
+  // These entries are public on the report page, so cap how fast one account can add them.
+  await enforceRateLimit(`activity:${actor.userId}`, 20, 3600);
   const [row] = await query<{ status: Status }>("SELECT status FROM reports WHERE id = $1", [id]);
   if (!row || !isPublicStatus(row.status)) throw new HttpError(404, "Report not found");
   await query(

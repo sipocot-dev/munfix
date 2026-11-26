@@ -54,6 +54,33 @@ export const STATUS_COLOR: Record<Status, string> = {
   withdrawn: "#94a3b8",
 };
 
+/**
+ * Darker shade of each status colour for text and small icons: every value is at least 4.5:1 on white
+ * and on its own 10% badge tint (checked in tests/unit/design-system.test.ts). STATUS_COLOR alone fails AA for amber and green.
+ */
+export const STATUS_TEXT: Record<Status, string> = {
+  submitted: "#334155",
+  under_review: "#6d28d9",
+  verified: "#92400e",
+  in_progress: "#1d4ed8",
+  resolved: "#166534",
+  rejected: "#b91c1c",
+  duplicate: "#475569",
+  withdrawn: "#475569",
+};
+
+/** One-line explanation of each status for citizens. */
+export const STATUS_HELP: Record<Status, string> = {
+  submitted: "Received. City staff will review it before it is published.",
+  under_review: "A moderator is checking the details.",
+  verified: "Confirmed by city staff and visible on the public map.",
+  in_progress: "A crew is working on it.",
+  resolved: "Marked as fixed.",
+  rejected: "Not accepted. The reason is in the timeline.",
+  duplicate: "Merged into an existing report.",
+  withdrawn: "Withdrawn by the reporter.",
+};
+
 export function isStatus(value: unknown): value is Status {
   return typeof value === "string" && (STATUSES as readonly string[]).includes(value);
 }

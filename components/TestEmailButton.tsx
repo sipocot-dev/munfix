@@ -23,10 +23,10 @@ export default function TestEmailButton() {
 
   return (
     <div className="flex flex-wrap items-center gap-3">
-      <button type="button" onClick={send} disabled={busy} className="btn btn-secondary !py-1.5">
+      <button type="button" onClick={send} disabled={busy} className="btn btn-secondary btn-sm">
         {busy ? "Sending…" : "Send test email to me"}
       </button>
-      {msg && <span role="status" className={`text-sm ${msg.ok ? "text-ink-700" : "text-red-700"}`}>{msg.text}</span>}
+      {msg && <span role="status" className={`text-sm ${msg.ok ? "text-green-800" : "text-red-700"}`}>{msg.text}</span>}
     </div>
   );
 }

@@ -3,31 +3,46 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { apiError } from "@/lib/client";
+import Alert from "./ui/Alert";
+import { useConfirm, useToast } from "./ui/Feedback";
+import Spinner from "./ui/Spinner";
 
 export default function WithdrawButton({ id }: { id: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
+  const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function withdraw() {
-    if (!window.confirm("Withdraw this report? This cannot be undone.")) return;
+    const ok = await confirm({
+      title: "Withdraw this report?",
+      body: "City staff will stop reviewing it and it will never be published. This cannot be undone.",
+      confirmLabel: "Withdraw report",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     setError(null);
-    const res = await fetch(`/api/v1/reports/${id}`, { method: "DELETE" });
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/v1/reports/${id}`, { method: "DELETE" });
+      if (!res.ok) return setError(apiError(await res.json().catch(() => ({}))));
+      toast("Your report was withdrawn.");
       router.refresh();
-    } else {
-      setError(apiError(await res.json().catch(() => ({}))));
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
-    <div>
-      <button onClick={withdraw} disabled={busy} className="btn btn-danger">
+    <div className="space-y-3">
+      <button type="button" onClick={withdraw} disabled={busy} className="btn btn-danger btn-sm">
+        {busy && <Spinner />}
         {busy ? "Withdrawing…" : "Withdraw report"}
       </button>
-      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
     </div>
   );
 }

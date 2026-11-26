@@ -1,10 +1,15 @@
 import Explorer from "@/components/Explorer";
-import { MUNICIPALITY } from "@/lib/config";
+import Alert from "@/components/ui/Alert";
 import { getStats, listCategories, listPublicReports } from "@/lib/reports";
+import { filtersFromQuery } from "@/lib/explorer";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+type Search = { status?: string; category?: string; q?: string };
+
+export default async function HomePage({ searchParams }: { searchParams: Promise<Search> }) {
+  const sp = await searchParams;
+
   // Each part loads on its own: if stats fail, the map and reports still show.
   let degraded = false;
   const fail = <T,>(what: string, fallback: T) => (err: unknown) => {
@@ -14,21 +19,27 @@ export default async function HomePage() {
   };
   const [reports, stats, categories] = await Promise.all([
     listPublicReports({ limit: 500 }).catch(fail("reports", [] as Awaited<ReturnType<typeof listPublicReports>>)),
-    getStats().catch(fail("stats", { verified: 0, inProgress: 0, resolved: 0, avgResolutionDays: null })),
+    // null, not zeros: a failed load must not look like "nothing reported".
+    getStats().catch(fail("stats", null)),
     listCategories().catch(fail("categories", [] as Awaited<ReturnType<typeof listCategories>>)),
   ]);
 
   return (
     <>
       {degraded && (
-        <p role="alert" className="absolute left-1/2 top-20 z-10 -translate-x-1/2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-md">
-          Reports could not be loaded right now. Please refresh in a moment.
-        </p>
+        <div className="absolute left-1/2 top-20 z-20 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 shadow-[var(--shadow-raised)]">
+          <Alert tone="warning" title="Some information could not be loaded">
+            The map may be incomplete. Please refresh in a moment.
+          </Alert>
+        </div>
       )}
-      <h1 className="sr-only">
-        {MUNICIPALITY.name}, {MUNICIPALITY.province}: report problems and watch them get fixed
-      </h1>
-      <Explorer initialReports={reports} categories={categories} stats={stats} />
+      <Explorer
+        initialReports={reports}
+        categories={categories}
+        stats={stats}
+        // From the URL so a filtered view can be shared.
+        initialFilters={filtersFromQuery(sp, categories.map((c) => c.slug))}
+      />
     </>
   );
 }
