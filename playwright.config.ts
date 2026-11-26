@@ -43,7 +43,9 @@ export default defineConfig({
             use: {
               ...devices["Desktop Firefox"],
               viewport: { width: 1280, height: 800 },
-              // Headless Firefox on CI has no GPU and turns WebGL off; force software rendering so the map draws.
+              // Headless Firefox has no WebGL on a GPU-less runner. CI runs this project headed under xvfb
+              // (E2E_HEADED_FIREFOX=1), where Mesa provides software OpenGL, so the map can draw.
+              headless: process.env.E2E_HEADED_FIREFOX !== "1",
               launchOptions: { firefoxUserPrefs: { "webgl.force-enabled": true, "webgl.disabled": false } },
             },
           },

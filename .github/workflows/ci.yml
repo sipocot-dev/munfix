@@ -71,7 +71,12 @@ jobs:
       - run: npm run build
       - name: Migrate and seed (categories, roles, test accounts, sample reports)
         run: npm run db:migrate && SEED_DEMO=true npm run db:seed
-      - run: npm run test:e2e
+      - name: End-to-end tests (Chromium projects and WebKit)
+        run: npx playwright test --project=setup --project=desktop --project=tablet --project=mobile --project=mobile-small --project=webkit-mobile
+      - name: End-to-end tests (Firefox, headed under a virtual display for WebGL)
+        run: xvfb-run -a npx playwright test --project=setup --project=firefox
+        env:
+          E2E_HEADED_FIREFOX: "1"
       - name: Upload report, traces and screenshots
         if: failure()
         uses: actions/upload-artifact@v4
